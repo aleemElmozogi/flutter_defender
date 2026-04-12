@@ -1,0 +1,60 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+*.swo
+*~
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ / Android Studio
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# VS Code — uncomment if your team does not commit workspace settings
+# .vscode/
+
+# Flutter & Dart
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+coverage/
+*.lcov
+
+# Symbolication / obfuscation
+app.*.symbols
+app.*.map.json
+
+# Android Studio build outputs (per-variant)
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Environment and local secrets
+.env
+.env.*
+!.env.example
+
+# Integration / driver tooling
+integration_test/screenshots/
+
+# Golden test output
+test/**/failures/
+
+# FVM
+.fvm/

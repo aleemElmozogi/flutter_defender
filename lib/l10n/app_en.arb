@@ -1,0 +1,9 @@
+{
+  "@@locale": "en",
+  "blockingScreenTitle": "Security Policy",
+  "emulatorReleaseBlocked": "Security Policy: This app cannot run on emulators in release mode.",
+  "screenshotsBlocked": "Security Policy: Screenshots are not allowed on sensitive screens.",
+  "overlaysBlocked": "Security Policy: Screen overlays are not allowed while sensitive content is visible.",
+  "screenCaptureBlocked": "Security Policy: Screen recording or mirroring is not allowed.",
+  "foregroundRequired": "Security Policy: Sensitive screens require the app to remain in the foreground."
+}
