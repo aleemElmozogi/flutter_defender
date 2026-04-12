@@ -7,7 +7,7 @@ Unified Flutter security helpers for banking-style apps: sensitive-route hardeni
 - **Route-aware `FLAG_SECURE` (Android)** toggles when entering or leaving routes you mark as sensitive.
 - **Blocking overlay** when policy is violated (screen capture, overlay permission on sensitive routes, foreground checks, release-mode emulator).
 - **Screenshot attempt** feedback on sensitive routes (Android 14+ screen capture callback where available).
-- **Lifecycle rules**: optional OTP route pop after background timeout; optional logout callback after authenticated-route background timeout.
+- **Lifecycle rules**: optional OTP route pop after background timeout; optional logout callback after long background while the app reports the user as authenticated (`setAuthenticated(true)`).
 - **Localization** for built-in blocking copy (English, Spanish, French, Arabic). Extend by adding ARB files under `lib/l10n/` and running code generation.
 - **Flexible i18n**: use your app’s existing `MaterialApp` locale, merge `supportedLocales`, force a locale only for the blocking overlay, or plug in your own string resolvers.
 - **Custom default blocking UI** via `FlutterDefenderUiTheme`, or supply your own `blockingScreenBuilder`.
@@ -117,14 +117,13 @@ Call `init` once you know your route names (must match the names used in `Naviga
 await defender.init(
   sensitiveRoutes: ['/pin', '/statement', '/otp'],
   otpRouteName: '/otp',
-  authenticatedRoutes: ['/home', '/accounts'],
   otpBackgroundTimeoutSeconds: 60,
   pinBackgroundTimeoutSeconds: 120,
   enableOverlayDetection: true,
   enableForegroundCheck: true,
   enableEmulatorDetectionRelease: true,
   onLogoutRequested: () {
-    // Clear session after long background on authenticated routes
+    // Clear session after long background while authenticated (see below)
   },
   blockingScreenBuilder: null, // use default BlockingScreen + uiTheme
   uiTheme: FlutterDefenderUiTheme.defaults.copyWith(
@@ -134,6 +133,13 @@ await defender.init(
   messageResolver: null,
   blockingTitleResolver: null,
 );
+```
+
+After login and logout, tell the plugin whether a banking session is active (PIN/session background timeout only runs while this is `true`; OTP pop still uses `otpRouteName` only):
+
+```dart
+defender.setAuthenticated(true);  // e.g. after successful login
+defender.setAuthenticated(false); // e.g. on logout (also clears pending background clock)
 ```
 
 Call `defender.dispose()` when tearing down the app shell (for example in tests or logout flows that remove the observer entirely).

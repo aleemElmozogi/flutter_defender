@@ -26,6 +26,10 @@ class FlutterDefenderRuntimeState {
   bool screenCaptureActive = false;
   bool emulatorBlocked = false;
 
+  /// Whether the app considers the user logged in; drives PIN/session
+  /// background timeout without relying on route names.
+  bool isAuthenticated = false;
+
   bool get hasPersistentBlockingSource =>
       blockingSource == DefenderBlockingSource.overlay ||
       blockingSource == DefenderBlockingSource.screenCapture ||
@@ -57,6 +61,7 @@ class FlutterDefenderRuntimeState {
     isRouteRefreshScheduled = false;
     screenCaptureActive = false;
     emulatorBlocked = false;
+    isAuthenticated = false;
     blockingMessageId.value = null;
   }
 }

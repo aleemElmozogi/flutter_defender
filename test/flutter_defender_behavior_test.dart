@@ -111,7 +111,6 @@ void main() {
 
   Future<void> initializeDefender({
     List<String> sensitiveRoutes = const <String>['/sensitive', '/otp'],
-    List<String> authenticatedRoutes = const <String>['/auth'],
     int otpBackgroundTimeoutSeconds = 60,
     int pinBackgroundTimeoutSeconds = 120,
     bool enableOverlayDetection = false,
@@ -121,7 +120,6 @@ void main() {
     return defender.init(
       sensitiveRoutes: sensitiveRoutes,
       otpRouteName: '/otp',
-      authenticatedRoutes: authenticatedRoutes,
       otpBackgroundTimeoutSeconds: otpBackgroundTimeoutSeconds,
       pinBackgroundTimeoutSeconds: pinBackgroundTimeoutSeconds,
       enableOverlayDetection: enableOverlayDetection,
@@ -283,25 +281,27 @@ void main() {
     expect(find.text('otp'), findsNothing);
   });
 
-  testWidgets('requests logout after authenticated-route background timeout', (
-    WidgetTester tester,
-  ) async {
-    final GlobalKey<NavigatorState> navigatorKey = await pumpApp(tester);
-    var logoutRequested = false;
+  testWidgets(
+    'requests logout after background timeout while authenticated',
+    (WidgetTester tester) async {
+      final GlobalKey<NavigatorState> navigatorKey = await pumpApp(tester);
+      var logoutRequested = false;
 
-    await initializeDefender(
-      pinBackgroundTimeoutSeconds: -1,
-      onLogoutRequested: () {
-        logoutRequested = true;
-      },
-    );
-    navigatorKey.currentState!.pushNamed('/auth');
-    await tester.pumpAndSettle();
+      await initializeDefender(
+        pinBackgroundTimeoutSeconds: -1,
+        onLogoutRequested: () {
+          logoutRequested = true;
+        },
+      );
+      defender.setAuthenticated(true);
+      navigatorKey.currentState!.pushNamed('/public');
+      await tester.pumpAndSettle();
 
-    defender.didChangeAppLifecycleState(AppLifecycleState.paused);
-    defender.didChangeAppLifecycleState(AppLifecycleState.resumed);
-    await tester.pumpAndSettle();
+      defender.didChangeAppLifecycleState(AppLifecycleState.paused);
+      defender.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
 
-    expect(logoutRequested, isTrue);
-  });
+      expect(logoutRequested, isTrue);
+    },
+  );
 }

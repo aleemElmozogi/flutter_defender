@@ -6,7 +6,6 @@ import 'flutter_defender_ui_theme.dart';
 class FlutterDefenderConfig {
   const FlutterDefenderConfig({
     this.sensitiveRouteSet = const <String>{},
-    this.authenticatedRouteSet = const <String>{},
     this.otpRouteName = '',
     this.otpBackgroundTimeoutSeconds = 60,
     this.pinBackgroundTimeoutSeconds = 120,
@@ -24,7 +23,6 @@ class FlutterDefenderConfig {
   factory FlutterDefenderConfig.fromInit({
     required List<String> sensitiveRoutes,
     required String otpRouteName,
-    required List<String> authenticatedRoutes,
     required int otpBackgroundTimeoutSeconds,
     required int pinBackgroundTimeoutSeconds,
     required bool enableOverlayDetection,
@@ -40,7 +38,6 @@ class FlutterDefenderConfig {
   }) {
     return FlutterDefenderConfig(
       sensitiveRouteSet: Set<String>.unmodifiable(sensitiveRoutes),
-      authenticatedRouteSet: Set<String>.unmodifiable(authenticatedRoutes),
       otpRouteName: otpRouteName,
       otpBackgroundTimeoutSeconds: otpBackgroundTimeoutSeconds,
       pinBackgroundTimeoutSeconds: pinBackgroundTimeoutSeconds,
@@ -57,7 +54,6 @@ class FlutterDefenderConfig {
   }
 
   final Set<String> sensitiveRouteSet;
-  final Set<String> authenticatedRouteSet;
   final String otpRouteName;
   final int otpBackgroundTimeoutSeconds;
   final int pinBackgroundTimeoutSeconds;

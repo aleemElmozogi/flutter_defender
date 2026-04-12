@@ -45,7 +45,6 @@ class FlutterDefender with WidgetsBindingObserver {
   Future<void> init({
     required List<String> sensitiveRoutes,
     required String otpRouteName,
-    required List<String> authenticatedRoutes,
     int otpBackgroundTimeoutSeconds = 60,
     int pinBackgroundTimeoutSeconds = 120,
     bool enableOverlayDetection = true,
@@ -62,7 +61,6 @@ class FlutterDefender with WidgetsBindingObserver {
     _config = FlutterDefenderConfig.fromInit(
       sensitiveRoutes: sensitiveRoutes,
       otpRouteName: otpRouteName,
-      authenticatedRoutes: authenticatedRoutes,
       otpBackgroundTimeoutSeconds: otpBackgroundTimeoutSeconds,
       pinBackgroundTimeoutSeconds: pinBackgroundTimeoutSeconds,
       enableOverlayDetection: enableOverlayDetection,
@@ -98,6 +96,17 @@ class FlutterDefender with WidgetsBindingObserver {
     }
 
     await _refreshRouteProtection();
+  }
+
+  /// Notifies the plugin whether the user is logged in. Call with `true` after
+  /// a successful login and `false` on logout. PIN/session background timeout
+  /// applies only while this is `true` (OTP timeout still uses the OTP route
+  /// name passed to `FlutterDefender.init`).
+  void setAuthenticated(bool authenticated) {
+    _runtime.isAuthenticated = authenticated;
+    if (!authenticated) {
+      _runtime.pausedAt = null;
+    }
   }
 
   void dispose() {
@@ -173,7 +182,7 @@ class FlutterDefender with WidgetsBindingObserver {
         await _refreshRouteProtection();
         return;
       }
-      if (_config.authenticatedRouteSet.contains(routeName) &&
+      if (_runtime.isAuthenticated &&
           elapsedSeconds > _config.pinBackgroundTimeoutSeconds) {
         _config.onLogoutRequested?.call();
       }

@@ -11,6 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - _(nothing yet — add entries here before the next release)_
 
+## [0.1.0] - 2026-04-12
+
+### Added
+
+- `FlutterDefender.setAuthenticated(bool)` so the app signals login/logout instead of passing a list of authenticated route names.
+
+### Changed
+
+- **Breaking:** `FlutterDefender.init` no longer accepts `authenticatedRoutes`. PIN/session background timeout uses `setAuthenticated(true)` only.
+
+### Removed
+
+- `FlutterDefenderConfig.authenticatedRouteSet` and related `init` parameter.
+
 ## [0.0.1] - 2026-04-12
 
 ### Added
