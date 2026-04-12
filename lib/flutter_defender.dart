@@ -4,6 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'flutter_defender_localization_support.dart';
+import 'l10n/flutter_defender_localizations.dart';
+
 import 'src/blocking_screen.dart';
 import 'src/flutter_defender_config.dart';
 import 'src/flutter_defender_message_id.dart';
@@ -13,6 +16,7 @@ import 'src/flutter_defender_runtime_state.dart';
 import 'src/flutter_defender_ui_theme.dart';
 import 'flutter_defender_platform_interface.dart';
 
+export 'flutter_defender_localization_support.dart';
 export 'l10n/flutter_defender_localizations.dart';
 export 'src/blocking_screen.dart';
 export 'src/flutter_defender_message_id.dart';
@@ -50,6 +54,10 @@ class FlutterDefender with WidgetsBindingObserver {
     Widget Function(String message)? blockingScreenBuilder,
     VoidCallback? onLogoutRequested,
     FlutterDefenderUiTheme uiTheme = FlutterDefenderUiTheme.defaults,
+    Locale? blockingLocale,
+    String Function(BuildContext context, FlutterDefenderMessageId id)?
+        messageResolver,
+    String Function(BuildContext context)? blockingTitleResolver,
   }) async {
     _config = FlutterDefenderConfig.fromInit(
       sensitiveRoutes: sensitiveRoutes,
@@ -63,6 +71,9 @@ class FlutterDefender with WidgetsBindingObserver {
       blockingScreenBuilder: blockingScreenBuilder,
       onLogoutRequested: onLogoutRequested,
       uiTheme: uiTheme,
+      blockingLocale: blockingLocale,
+      messageResolver: messageResolver,
+      blockingTitleResolver: blockingTitleResolver,
     );
 
     FlutterDefenderPlatform.instance.setMethodCallHandler(
@@ -313,32 +324,86 @@ class FlutterDefender with WidgetsBindingObserver {
       return;
     }
     _runtime.blockingEntry = OverlayEntry(
-      builder: (BuildContext context) {
+      builder: (BuildContext overlayContext) {
         return Positioned.fill(
-          child: ValueListenableBuilder<FlutterDefenderMessageId?>(
-            valueListenable: _runtime.blockingMessageId,
-            builder:
-                (
-                  BuildContext context,
-                  FlutterDefenderMessageId? messageId,
-                  Widget? child,
-                ) {
-                  if (messageId == null) {
-                    return const SizedBox.shrink();
-                  }
-                  final String message =
-                      FlutterDefenderMessages.resolved(context, messageId);
-                  return _config.blockingScreenBuilder?.call(message) ??
-                      BlockingScreen(
-                        message: message,
-                        theme: _config.uiTheme,
-                      );
-                },
+          child: _wrapBlockingLocalizationScope(
+            overlayContext,
+            ValueListenableBuilder<FlutterDefenderMessageId?>(
+              valueListenable: _runtime.blockingMessageId,
+              builder:
+                  (
+                    BuildContext context,
+                    FlutterDefenderMessageId? messageId,
+                    Widget? child,
+                  ) {
+                    if (messageId == null) {
+                      return const SizedBox.shrink();
+                    }
+                    return Builder(
+                      builder: (BuildContext innerContext) {
+                        final String message = _resolveBlockingMessage(
+                          innerContext,
+                          messageId,
+                        );
+                        final String? explicitTitle =
+                            _config.blockingTitleResolver != null
+                            ? _resolveBlockingTitle(innerContext)
+                            : null;
+                        return _config.blockingScreenBuilder?.call(message) ??
+                            BlockingScreen(
+                              title: explicitTitle,
+                              message: message,
+                              theme: _config.uiTheme,
+                            );
+                      },
+                    );
+                  },
+            ),
           ),
         );
       },
     );
     overlayState.insert(_runtime.blockingEntry!);
+  }
+
+  Widget _wrapBlockingLocalizationScope(
+    BuildContext overlayContext,
+    Widget child,
+  ) {
+    final Locale? forced = _config.blockingLocale;
+    if (forced == null) {
+      return child;
+    }
+    return Localizations.override(
+      context: overlayContext,
+      locale: forced,
+      delegates: FlutterDefenderLocalizations.localizationsDelegates,
+      child: Directionality(
+        textDirection: flutterDefenderTextDirectionForLocale(forced),
+        child: child,
+      ),
+    );
+  }
+
+  String _resolveBlockingMessage(
+    BuildContext context,
+    FlutterDefenderMessageId messageId,
+  ) {
+    final String Function(BuildContext, FlutterDefenderMessageId)? resolver =
+        _config.messageResolver;
+    if (resolver != null) {
+      return resolver(context, messageId);
+    }
+    return FlutterDefenderMessages.resolved(context, messageId);
+  }
+
+  String _resolveBlockingTitle(BuildContext context) {
+    final String Function(BuildContext)? resolver =
+        _config.blockingTitleResolver;
+    if (resolver != null) {
+      return resolver(context);
+    }
+    return FlutterDefenderMessages.blockingTitleFor(context);
   }
 
   void _clearBlockingOverlay() {

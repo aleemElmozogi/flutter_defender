@@ -2,6 +2,7 @@ name: flutter_defender
 description: "Unified Flutter security package."
 version: 0.0.1
 homepage:
+license: Apache-2.0
 
 environment:
   sdk: ^3.10.1

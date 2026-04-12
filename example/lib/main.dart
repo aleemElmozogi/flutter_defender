@@ -48,8 +48,14 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       locale: _locale,
-      localizationsDelegates: FlutterDefenderLocalizations.localizationsDelegates,
-      supportedLocales: FlutterDefenderLocalizations.supportedLocales,
+      localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+        ...FlutterDefenderLocalizations.localizationsDelegates,
+      ],
+      // In a real app, merge your own supported locales with the defender list:
+      // mergeFlutterDefenderSupportedLocales(AppLocalizations.supportedLocales)
+      supportedLocales: mergeFlutterDefenderSupportedLocales(const <Locale>[
+        Locale('en', 'US'),
+      ]),
       home: Scaffold(
         appBar: AppBar(
           title: const Text('flutter_defender example'),

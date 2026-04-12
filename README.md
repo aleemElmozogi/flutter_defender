@@ -9,6 +9,7 @@ Unified Flutter security helpers for banking-style apps: sensitive-route hardeni
 - **Screenshot attempt** feedback on sensitive routes (Android 14+ screen capture callback where available).
 - **Lifecycle rules**: optional OTP route pop after background timeout; optional logout callback after authenticated-route background timeout.
 - **Localization** for built-in blocking copy (English, Spanish, French, Arabic). Extend by adding ARB files under `lib/l10n/` and running code generation.
+- **Flexible i18n**: use your app’s existing `MaterialApp` locale, merge `supportedLocales`, force a locale only for the blocking overlay, or plug in your own string resolvers.
 - **Custom default blocking UI** via `FlutterDefenderUiTheme`, or supply your own `blockingScreenBuilder`.
 
 ## Installation
@@ -25,22 +26,73 @@ Run `flutter pub get`.
 
 ## App setup
 
-### 1. Localization delegates
+### 1. Localization (choose what fits your app)
 
-Register the package localizations on your root `MaterialApp` (or `CupertinoApp` with compatible delegates) so blocking messages and titles resolve correctly:
+The blocking overlay reads strings from a `BuildContext` under your `MaterialApp`. You can combine the plugin with your app in several ways.
+
+#### A. Same locale as the rest of the app (recommended)
+
+Append the defender delegate to your **existing** delegates list so the overlay inherits the same `Locale` as the rest of the UI. Merge `supportedLocales` so every language your app claims to support is listed (include defender locales you ship):
 
 ```dart
 import 'package:flutter_defender/flutter_defender.dart';
+// import 'package:my_app/l10n/app_localizations.dart';
 
 MaterialApp(
-  localizationsDelegates: FlutterDefenderLocalizations.localizationsDelegates,
-  supportedLocales: FlutterDefenderLocalizations.supportedLocales,
-  // Optionally set locale: Locale('ar'), etc.
+  locale: appLocale, // optional: however you already drive locale
+  localizationsDelegates: const [
+    // AppLocalizations.delegate,
+    // ...your other delegates,
+    FlutterDefenderLocalizations.delegate,
+  ],
+  supportedLocales: mergeFlutterDefenderSupportedLocales(
+    const [
+      Locale('en'),
+      Locale('de'),
+      // ...your AppLocalizations.supportedLocales,
+    ],
+  ),
   home: const HomeScreen(),
 );
 ```
 
-If delegates are missing, the plugin falls back to English strings from `FlutterDefenderMessages`.
+`mergeFlutterDefenderSupportedLocales` unions your list with `FlutterDefenderLocalizations.supportedLocales` without duplicate entries (first occurrence wins). It is exported from `package:flutter_defender/flutter_defender.dart`.
+
+If you omit `FlutterDefenderLocalizations.delegate`, the plugin uses **English fallbacks** from `FlutterDefenderMessages` unless you use option B or C below.
+
+#### B. Force a locale only for the blocking UI
+
+If the blocking overlay should always use a specific language (independent of `MaterialApp.locale`), pass it to `init`:
+
+```dart
+await defender.init(
+  // ...
+  blockingLocale: const Locale('ar'),
+);
+```
+
+The overlay is wrapped with `Localizations.override` and an appropriate `TextDirection` for RTL languages such as Arabic.
+
+#### C. Wire strings to your own `AppLocalizations`
+
+If you already maintain all copy in your app, you can skip defender ARBs for the overlay body and title:
+
+```dart
+await defender.init(
+  // ...
+  messageResolver: (context, id) {
+    // final loc = AppLocalizations.of(context)!;
+    // return switch (id) { ... };
+    return FlutterDefenderMessages.stringFor(id);
+  },
+  blockingTitleResolver: (context) {
+    // return AppLocalizations.of(context)!.securityPolicyTitle;
+    return FlutterDefenderMessages.blockingScreenTitle;
+  },
+);
+```
+
+When `messageResolver` is set, it is used for every blocking **message** line. When `blockingTitleResolver` is set, the default `BlockingScreen` uses it for the **title** (your `blockingScreenBuilder` can ignore this and draw anything you want).
 
 ### 2. Navigator observer
 
@@ -78,6 +130,9 @@ await defender.init(
   uiTheme: FlutterDefenderUiTheme.defaults.copyWith(
     backgroundColor: const Color(0xFF0D1117),
   ),
+  blockingLocale: null,
+  messageResolver: null,
+  blockingTitleResolver: null,
 );
 ```
 
@@ -85,7 +140,7 @@ Call `defender.dispose()` when tearing down the app shell (for example in tests 
 
 ### 4. Custom blocking widget
 
-`blockingScreenBuilder` receives the **already localized** message string:
+`blockingScreenBuilder` receives the **already localized** message string (after `messageResolver` / `FlutterDefenderLocalizations` / fallbacks):
 
 ```dart
 await defender.init(
@@ -131,4 +186,4 @@ flutter analyze
 
 ## License
 
-See the repository or package metadata for license terms.
+This project is licensed under the **Apache License 2.0**; see the [`LICENSE`](LICENSE) file in the repository root.

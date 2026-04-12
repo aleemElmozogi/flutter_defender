@@ -7,10 +7,15 @@ class BlockingScreen extends StatelessWidget {
   const BlockingScreen({
     super.key,
     required this.message,
+    this.title,
     this.theme = FlutterDefenderUiTheme.defaults,
   });
 
   final String message;
+
+  /// When null, the title is resolved from [FlutterDefenderLocalizations] or
+  /// English fallback.
+  final String? title;
   final FlutterDefenderUiTheme theme;
 
   @override
@@ -38,7 +43,7 @@ class BlockingScreen extends StatelessWidget {
                 ),
                 SizedBox(height: t.spacingBelowLogoCard),
                 Text(
-                  FlutterDefenderMessages.blockingTitleFor(context),
+                  title ?? FlutterDefenderMessages.blockingTitleFor(context),
                   textAlign: TextAlign.center,
                   style: t.titleStyle,
                 ),
