@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 
-import 'flutter_defender_message_id.dart';
-import 'flutter_defender_ui_theme.dart';
+import '../ui/flutter_defender_message_id.dart';
+import '../ui/flutter_defender_ui_theme.dart';
 
 class FlutterDefenderConfig {
   const FlutterDefenderConfig({
@@ -27,7 +27,7 @@ class FlutterDefenderConfig {
     FlutterDefenderUiTheme uiTheme = FlutterDefenderUiTheme.defaults,
     Locale? blockingLocale,
     String Function(BuildContext context, FlutterDefenderMessageId id)?
-        messageResolver,
+    messageResolver,
     String Function(BuildContext context)? blockingTitleResolver,
   }) {
     RangeError.checkNotNegative(
@@ -61,6 +61,6 @@ class FlutterDefenderConfig {
   final FlutterDefenderUiTheme uiTheme;
   final Locale? blockingLocale;
   final String Function(BuildContext context, FlutterDefenderMessageId id)?
-      messageResolver;
+  messageResolver;
   final String Function(BuildContext context)? blockingTitleResolver;
 }

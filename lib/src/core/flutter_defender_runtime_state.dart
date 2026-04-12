@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import 'flutter_defender_message_id.dart';
+import '../ui/flutter_defender_message_id.dart';
 
 enum DefenderBlockingSource {
   emulator,
@@ -12,10 +12,7 @@ enum DefenderBlockingSource {
   foreground,
 }
 
-enum FlutterDefenderGuardType {
-  sensitive,
-  otp,
-}
+enum FlutterDefenderGuardType { sensitive, otp }
 
 class FlutterDefenderRuntimeState {
   final ValueNotifier<FlutterDefenderMessageId?> blockingMessageId =

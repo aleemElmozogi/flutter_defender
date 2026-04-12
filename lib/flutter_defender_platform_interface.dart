@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
-import 'src/pigeon/defender_messages.g.dart';
-import 'src/pigeon_flutter_defender_platform.dart';
+import 'src/platform/pigeon/defender_messages.g.dart';
+import 'src/platform/pigeon_flutter_defender_platform.dart';
 
 typedef FlutterDefenderBoolCallback = void Function(bool value);
 

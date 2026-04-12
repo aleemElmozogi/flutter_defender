@@ -48,11 +48,7 @@ class BlockingScreen extends StatelessWidget {
                   style: t.titleStyle,
                 ),
                 SizedBox(height: t.spacingBelowTitle),
-                Text(
-                  message,
-                  textAlign: TextAlign.center,
-                  style: t.bodyStyle,
-                ),
+                Text(message, textAlign: TextAlign.center, style: t.bodyStyle),
               ],
             ),
           ),

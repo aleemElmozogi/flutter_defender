@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_defender/flutter_defender.dart';
 import 'package:flutter_defender/flutter_defender_platform_interface.dart';
-import 'package:flutter_defender/src/pigeon/defender_messages.g.dart' as pigeon;
-import 'package:flutter_defender/src/pigeon_flutter_defender_platform.dart';
+import 'package:flutter_defender/src/platform/pigeon/defender_messages.g.dart'
+    as pigeon;
+import 'package:flutter_defender/src/platform/pigeon_flutter_defender_platform.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
@@ -96,17 +97,18 @@ void main() {
     FlutterDefenderPlatform.instance = PigeonFlutterDefenderPlatform();
   });
 
-  testWidgets('init wires native callbacks and pause persists lifecycle state', (
-    WidgetTester tester,
-  ) async {
-    expect(fakePlatform.callbacks, isNotNull);
+  testWidgets(
+    'init wires native callbacks and pause persists lifecycle state',
+    (WidgetTester tester) async {
+      expect(fakePlatform.callbacks, isNotNull);
 
-    defender.setAuthenticated(true);
-    defender.didChangeAppLifecycleState(AppLifecycleState.paused);
+      defender.setAuthenticated(true);
+      defender.didChangeAppLifecycleState(AppLifecycleState.paused);
 
-    expect(fakePlatform.savedSnapshots, isNotEmpty);
-    expect(fakePlatform.savedSnapshots.last.wasAuthenticated, isTrue);
-  });
+      expect(fakePlatform.savedSnapshots, isNotEmpty);
+      expect(fakePlatform.savedSnapshots.last.wasAuthenticated, isTrue);
+    },
+  );
 
   testWidgets('blocking overlay prevents interaction for custom builders', (
     WidgetTester tester,
@@ -121,7 +123,8 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: FlutterDefenderLocalizations.localizationsDelegates,
+        localizationsDelegates:
+            FlutterDefenderLocalizations.localizationsDelegates,
         supportedLocales: FlutterDefenderLocalizations.supportedLocales,
         home: FlutterDefenderSensitiveGuard(
           child: Scaffold(

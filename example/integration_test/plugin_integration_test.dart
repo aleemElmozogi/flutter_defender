@@ -13,7 +13,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('flutter_defender example'), findsOneWidget);
+    expect(find.text('Feature Lab'), findsOneWidget);
     expect(find.text('Open sensitive screen'), findsOneWidget);
     expect(find.text('Open OTP screen'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Open custom blocking demo'),
+      300,
+    );
+    expect(find.text('Open custom blocking demo'), findsOneWidget);
   });
 }

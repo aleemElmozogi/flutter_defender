@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 
-import '../l10n/flutter_defender_localizations.dart';
+import '../../l10n/flutter_defender_localizations.dart';
 import 'flutter_defender_message_id.dart';
 
 /// English fallbacks when [FlutterDefenderLocalizations] is not registered on
@@ -37,8 +37,9 @@ final class FlutterDefenderMessages {
   }
 
   static String resolved(BuildContext context, FlutterDefenderMessageId id) {
-    final FlutterDefenderLocalizations? loc =
-        FlutterDefenderLocalizations.of(context);
+    final FlutterDefenderLocalizations? loc = FlutterDefenderLocalizations.of(
+      context,
+    );
     if (loc != null) {
       return switch (id) {
         FlutterDefenderMessageId.emulatorReleaseBlocked =>

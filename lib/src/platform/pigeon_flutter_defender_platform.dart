@@ -1,4 +1,4 @@
-import '../flutter_defender_platform_interface.dart';
+import '../../flutter_defender_platform_interface.dart';
 import 'pigeon/defender_messages.g.dart';
 
 class _DefenderFlutterApiAdapter extends DefenderFlutterApi {
