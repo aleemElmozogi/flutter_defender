@@ -7,23 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Moved the package to explicit guarded screens with `FlutterDefenderSensitiveGuard` and `FlutterDefenderOtpGuard`.
+- Replaced the old ad hoc channel API with generated Pigeon messages.
+- Reworked Android overlay handling to use window hardening and obscured-touch interception instead of overlay-permission checks.
+- Persisted OTP/session background timeout state across process death.
+- Rebuilt the example app and README around the new guard-based API.
+
+## [0.2.0] - 2026-04-12
+
 ### Added
 
-- _(nothing yet — add entries here before the next release)_
-
-## [0.1.0] - 2026-04-12
-
-### Added
-
-- `FlutterDefender.setAuthenticated(bool)` so the app signals login/logout instead of passing a list of authenticated route names.
+- `FlutterDefenderSensitiveGuard` for secure guarded routes.
+- `FlutterDefenderOtpGuard` for OTP-only timeout popping.
+- Pigeon-generated Dart, Kotlin, and Swift platform bridge.
+- Native lifecycle snapshot persistence on Android and iOS.
+- Full-screen barrier enforcement for all blocking states, including custom builders.
 
 ### Changed
 
-- **Breaking:** `FlutterDefender.init` no longer accepts `authenticatedRoutes`. PIN/session background timeout uses `setAuthenticated(true)` only.
+- **Breaking:** Removed route-observer based protection and route-name configuration.
+- **Breaking:** `FlutterDefender.init` now configures policy only; guarded screens are declared with widgets.
+- **Breaking:** Removed the old method-channel query API from the public surface.
+- Android now applies overlay hardening instead of checking `Settings.canDrawOverlays`.
+- Documentation now explicitly describes iOS screenshot and overlay limitations.
 
-### Removed
+### Fixed
 
-- `FlutterDefenderConfig.authenticatedRouteSet` and related `init` parameter.
+- Closed the first-frame leak where secure-window protection used to apply after navigation.
+- Stopped custom blocking builders from accidentally allowing interaction with the guarded UI.
+- Ensured background timeout state is enforced after cold launch.
 
 ## [0.0.1] - 2026-04-12
 

@@ -1,16 +1,22 @@
-# flutter_defender_example
+# flutter_defender example
 
-Demonstrates how to use the flutter_defender plugin.
+This example is a manual verification harness for:
+- `FlutterDefenderSensitiveGuard`
+- `FlutterDefenderOtpGuard`
+- authenticated background timeout via `setAuthenticated(true)`
+- custom blocking UI
+- release emulator/simulator blocking
 
-## Getting Started
+## Run
 
-This project is a starting point for a Flutter application.
+```bash
+flutter run
+```
 
-A few resources to get you started if this is your first Flutter project:
+## Manual checks
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+1. Open **Sensitive Screen** and verify Android recents are blanked.
+2. Start screen recording or mirroring on iOS and verify the blocking screen appears.
+3. Open **OTP Screen**, background the app for more than 10 seconds, and verify only the OTP route is dismissed.
+4. Sign in, background the app for more than 20 seconds, and verify logout is requested.
+5. Build a **release** on an emulator/simulator and verify guarded screens are blocked.

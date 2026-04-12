@@ -1,7 +1,8 @@
 name: flutter_defender
-description: "Unified Flutter security package."
-version: 0.1.0
-homepage:
+description: "Secure-screen protection for Flutter apps."
+version: 0.2.0
+homepage: https://github.com/aleemElmozogi/flutter_defender
+repository: https://github.com/aleemElmozogi/flutter_defender
 license: Apache-2.0
 
 environment:
@@ -20,6 +21,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  pigeon: ^24.2.2
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

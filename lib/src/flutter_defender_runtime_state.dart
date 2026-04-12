@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 import 'flutter_defender_message_id.dart';
 
@@ -12,56 +12,57 @@ enum DefenderBlockingSource {
   foreground,
 }
 
+enum FlutterDefenderGuardType {
+  sensitive,
+  otp,
+}
+
 class FlutterDefenderRuntimeState {
   final ValueNotifier<FlutterDefenderMessageId?> blockingMessageId =
       ValueNotifier<FlutterDefenderMessageId?>(null);
-  OverlayEntry? blockingEntry;
-  Timer? overlayMonitorTimer;
-  Timer? temporaryBlockingTimer;
-  DateTime? pausedAt;
-  DefenderBlockingSource? blockingSource;
+
   bool initialized = false;
-  bool isRouteSensitive = false;
-  bool isRouteRefreshScheduled = false;
+  bool initInFlight = false;
+  bool isForeground = true;
   bool screenCaptureActive = false;
   bool emulatorBlocked = false;
-
-  /// Whether the app considers the user logged in; drives PIN/session
-  /// background timeout without relying on route names.
+  bool overlayViolationActive = false;
   bool isAuthenticated = false;
+  bool protectionReady = false;
+  bool pendingColdStartOtpPop = false;
+  bool logoutTriggeredForCurrentBackground = false;
+  int? pausedAtMs;
+  Timer? temporaryBlockingTimer;
+  DefenderBlockingSource? blockingSource;
 
   bool get hasPersistentBlockingSource =>
+      blockingSource == DefenderBlockingSource.emulator ||
       blockingSource == DefenderBlockingSource.overlay ||
       blockingSource == DefenderBlockingSource.screenCapture ||
       blockingSource == DefenderBlockingSource.foreground;
 
+  bool get shouldConcealGuardedContent =>
+      !protectionReady || pendingColdStartOtpPop || hasPersistentBlockingSource;
+
   void cancelTimers() {
-    overlayMonitorTimer?.cancel();
-    overlayMonitorTimer = null;
     temporaryBlockingTimer?.cancel();
     temporaryBlockingTimer = null;
   }
 
-  void removeBlockingEntry() {
-    blockingEntry?.remove();
-    blockingEntry = null;
-  }
-
-  void resetBlockingState() {
-    blockingSource = null;
-    removeBlockingEntry();
-  }
-
   void reset() {
     cancelTimers();
-    resetBlockingState();
-    pausedAt = null;
     initialized = false;
-    isRouteSensitive = false;
-    isRouteRefreshScheduled = false;
+    initInFlight = false;
+    isForeground = true;
     screenCaptureActive = false;
     emulatorBlocked = false;
+    overlayViolationActive = false;
     isAuthenticated = false;
+    protectionReady = false;
+    pendingColdStartOtpPop = false;
+    logoutTriggeredForCurrentBackground = false;
+    pausedAtMs = null;
+    blockingSource = null;
     blockingMessageId.value = null;
   }
 }
