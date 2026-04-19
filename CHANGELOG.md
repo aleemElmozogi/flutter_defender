@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rebuilt the example app and README around the new guard-based API.
 - Added iOS privacy concealment while guarded routes are inactive, and documented it separately from true overlay protection.
 - Expanded the example app into a configuration profile lab for UI customization and policy toggles.
+- Added GitHub Actions workflows for PR/main CI, release tag creation on version bumps, and tag-triggered pub.dev publishing.
 
 ## [0.2.0] - 2026-04-19
 

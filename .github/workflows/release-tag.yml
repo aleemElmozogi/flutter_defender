@@ -1,0 +1,88 @@
+name: Release Tag
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+concurrency:
+  group: release-tag-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  verify-and-tag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies (package)
+        run: flutter pub get
+
+      - name: Analyze package
+        run: flutter analyze
+
+      - name: Run package tests
+        run: flutter test
+
+      - name: Install dependencies (example)
+        working-directory: example
+        run: flutter pub get
+
+      - name: Analyze example
+        working-directory: example
+        run: flutter analyze
+
+      - name: Run example tests
+        working-directory: example
+        run: flutter test
+
+      - name: Extract current version
+        id: current_version
+        run: |
+          version=$(grep '^version:' pubspec.yaml | sed 's/^version:[[:space:]]*//')
+          if [ -z "$version" ]; then
+            echo "Could not read version from pubspec.yaml" >&2
+            exit 1
+          fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Verify version bump
+        run: |
+          before_sha="${{ github.event.before }}"
+          if [ "$before_sha" = "0000000000000000000000000000000000000000" ]; then
+            echo "Initial branch push detected; skipping previous-version comparison."
+            exit 0
+          fi
+
+          git show "${before_sha}:pubspec.yaml" > /tmp/previous-pubspec.yaml
+          python3 tool/check_version_bump.py /tmp/previous-pubspec.yaml pubspec.yaml
+
+      - name: Ensure release tag does not already exist
+        run: |
+          tag="v${{ steps.current_version.outputs.value }}"
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "Tag $tag already exists." >&2
+            exit 1
+          fi
+
+      - name: Create and push release tag
+        run: |
+          tag="v${{ steps.current_version.outputs.value }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$tag" "$GITHUB_SHA"
+          git push origin "$tag"

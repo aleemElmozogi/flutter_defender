@@ -204,6 +204,27 @@ cd example && flutter test
 flutter pub publish --dry-run
 ```
 
+## Release Automation
+
+This repository includes GitHub Actions for CI and publishing:
+
+- Pull requests run package and example analysis plus tests.
+- Pushes to `main` / `master` rerun those checks, verify that `pubspec.yaml`
+  contains a version higher than the previous branch tip, and then create a
+  matching Git tag such as `v0.2.1`.
+- Pushing that tag triggers the publish workflow, which runs a final
+  `flutter pub publish --dry-run` and then publishes to pub.dev.
+
+Important notes:
+
+- The first release of a new package must still be published manually with
+  `dart pub publish` / `flutter pub publish`.
+- Pub.dev automated publishing from GitHub Actions only works for workflows
+  triggered by tag pushes, so the main-branch workflow tags the release and the
+  tag workflow performs the actual publish.
+- Configure automated publishing for this package on pub.dev and require the
+  GitHub Actions environment named `pub.dev` to match the publish workflow.
+
 ## License
 
 Apache-2.0

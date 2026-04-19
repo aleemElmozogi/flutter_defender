@@ -1,4 +1,4 @@
-name: Unit tests
+name: CI
 
 on:
   pull_request:
@@ -8,11 +8,11 @@ on:
       - master
 
 concurrency:
-  group: unit-tests-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  flutter-test:
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -28,13 +28,20 @@ jobs:
       - name: Install dependencies (package)
         run: flutter pub get
 
-      - name: Run unit tests (package)
+      - name: Analyze package
+        run: flutter analyze
+
+      - name: Run package tests
         run: flutter test
 
       - name: Install dependencies (example)
         working-directory: example
         run: flutter pub get
 
-      - name: Run unit tests (example)
+      - name: Analyze example
+        working-directory: example
+        run: flutter analyze
+
+      - name: Run example tests
         working-directory: example
         run: flutter test
