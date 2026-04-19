@@ -1,0 +1,59 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+*.swo
+*~
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+codex/
+
+# IntelliJ / Android Studio
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# VS Code — uncomment if your team does not commit workspace settings
+# .vscode/
+
+# Flutter & Dart
+**/doc/api/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+coverage/
+*.lcov
+
+# Libraries should not commit pubspec.lock
+# https://dart.dev/guides/libraries/private-files#pubspeclock
+/pubspec.lock
+
+# Environment and local secrets (host apps)
+.env
+.env.*
+!.env.example
+
+# Symbolication / obfuscation (release builds)
+app.*.symbols
+app.*.map.json
+
+# Golden / screenshot test output
+test/**/failures/
+
+# FVM (Flutter Version Management)
+.fvm/
+
+# Melos
+.melos_tool/
