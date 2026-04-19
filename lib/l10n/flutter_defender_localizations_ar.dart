@@ -9,25 +9,24 @@ class FlutterDefenderLocalizationsAr extends FlutterDefenderLocalizations {
   FlutterDefenderLocalizationsAr([String locale = 'ar']) : super(locale);
 
   @override
-  String get blockingScreenTitle => 'سياسة الأمان';
+  String get blockingScreenTitle => 'حماية البيانات';
 
   @override
-  String get emulatorReleaseBlocked =>
-      'سياسة الأمان: لا يمكن تشغيل هذا التطبيق على المحاكيات في وضع الإصدار النهائي.';
+  String get emulatorReleaseBlocked => 'يجب استخدام جهاز حقيقي لتشغيل التطبيق.';
 
   @override
   String get screenshotsBlocked =>
-      'سياسة الأمان: ليست مسموحة لقطات الشاشة على الشاشات الحساسة.';
+      'تصوير الشاشة معطل في هذه الصفحة لحماية بياناتك.';
 
   @override
   String get overlaysBlocked =>
-      'سياسة الأمان: لا تُسمح بطبقات العرض فوق الشاشة أثناء عرض محتوى حساس.';
+      'هناك تطبيق آخر يغطي الشاشة، يرجى إغلاقه للمتابعة.';
 
   @override
   String get screenCaptureBlocked =>
-      'سياسة الأمان: لا يُسمح بتسجيل الشاشة أو عكسها.';
+      'يرجى إيقاف تسجيل الشاشة أو ميزة العرض اللاسلكي.';
 
   @override
   String get foregroundRequired =>
-      'سياسة الأمان: تتطلب الشاشات الحساسة بقاء التطبيق في المقدمة.';
+      'يجب عدم مغادرة هذه الشاشة حتى اكتمال العملية.';
 }

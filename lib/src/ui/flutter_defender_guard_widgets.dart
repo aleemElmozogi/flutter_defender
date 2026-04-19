@@ -75,14 +75,17 @@ abstract class _FlutterDefenderGuardState<T extends StatefulWidget>
 
   @override
   Widget build(BuildContext context) {
-    final bool isRouteCurrent = ModalRoute.isCurrentOf(context) ?? true;
-    final bool isRouteActiveInTree = TickerMode.of(context);
-    final bool shouldGuard = isRouteCurrent && isRouteActiveInTree;
-    _syncGuardRegistration(shouldGuard);
+    final ValueListenable<bool> tickerModeNotifier = TickerMode.getNotifier(
+      context,
+    );
 
     return AnimatedBuilder(
-      animation: defender,
+      animation: Listenable.merge(<Listenable>[defender, tickerModeNotifier]),
       builder: (BuildContext context, Widget? child) {
+        final bool isRouteCurrent = ModalRoute.isCurrentOf(context) ?? true;
+        final bool isRouteActiveInTree = tickerModeNotifier.value;
+        final bool shouldGuard = isRouteCurrent && isRouteActiveInTree;
+        _syncGuardRegistration(shouldGuard);
         final bool showChild =
             !shouldGuard ||
             (_registrationReady && !defender.shouldConcealGuardedContent);
