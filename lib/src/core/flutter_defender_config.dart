@@ -6,7 +6,7 @@ import '../ui/flutter_defender_ui_theme.dart';
 class FlutterDefenderConfig {
   const FlutterDefenderConfig({
     this.otpBackgroundTimeoutSeconds = 60,
-    this.pinBackgroundTimeoutSeconds = 120,
+    this.authenticatedBackgroundTimeoutSeconds = 120,
     this.enableForegroundCheck = true,
     this.enableEmulatorDetectionRelease = true,
     this.blockingScreenBuilder,
@@ -19,7 +19,7 @@ class FlutterDefenderConfig {
 
   factory FlutterDefenderConfig.fromInit({
     required int otpBackgroundTimeoutSeconds,
-    required int pinBackgroundTimeoutSeconds,
+    required int authenticatedBackgroundTimeoutSeconds,
     required bool enableForegroundCheck,
     required bool enableEmulatorDetectionRelease,
     required Widget Function(String message)? blockingScreenBuilder,
@@ -35,12 +35,13 @@ class FlutterDefenderConfig {
       'otpBackgroundTimeoutSeconds',
     );
     RangeError.checkNotNegative(
-      pinBackgroundTimeoutSeconds,
-      'pinBackgroundTimeoutSeconds',
+      authenticatedBackgroundTimeoutSeconds,
+      'authenticatedBackgroundTimeoutSeconds',
     );
     return FlutterDefenderConfig(
       otpBackgroundTimeoutSeconds: otpBackgroundTimeoutSeconds,
-      pinBackgroundTimeoutSeconds: pinBackgroundTimeoutSeconds,
+      authenticatedBackgroundTimeoutSeconds:
+          authenticatedBackgroundTimeoutSeconds,
       enableForegroundCheck: enableForegroundCheck,
       enableEmulatorDetectionRelease: enableEmulatorDetectionRelease,
       blockingScreenBuilder: blockingScreenBuilder,
@@ -53,7 +54,7 @@ class FlutterDefenderConfig {
   }
 
   final int otpBackgroundTimeoutSeconds;
-  final int pinBackgroundTimeoutSeconds;
+  final int authenticatedBackgroundTimeoutSeconds;
   final bool enableForegroundCheck;
   final bool enableEmulatorDetectionRelease;
   final Widget Function(String message)? blockingScreenBuilder;

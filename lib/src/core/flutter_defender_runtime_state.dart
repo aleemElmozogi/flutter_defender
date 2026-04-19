@@ -27,6 +27,7 @@ class FlutterDefenderRuntimeState {
   bool isAuthenticated = false;
   bool protectionReady = false;
   bool pendingColdStartOtpPop = false;
+  bool inactivePrivacyShieldActive = false;
   bool logoutTriggeredForCurrentBackground = false;
   int? pausedAtMs;
   Timer? temporaryBlockingTimer;
@@ -39,7 +40,10 @@ class FlutterDefenderRuntimeState {
       blockingSource == DefenderBlockingSource.foreground;
 
   bool get shouldConcealGuardedContent =>
-      !protectionReady || pendingColdStartOtpPop || hasPersistentBlockingSource;
+      !protectionReady ||
+      pendingColdStartOtpPop ||
+      inactivePrivacyShieldActive ||
+      hasPersistentBlockingSource;
 
   void cancelTimers() {
     temporaryBlockingTimer?.cancel();
@@ -57,6 +61,7 @@ class FlutterDefenderRuntimeState {
     isAuthenticated = false;
     protectionReady = false;
     pendingColdStartOtpPop = false;
+    inactivePrivacyShieldActive = false;
     logoutTriggeredForCurrentBackground = false;
     pausedAtMs = null;
     blockingSource = null;

@@ -74,7 +74,12 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
 
   Future<void> init({
     int otpBackgroundTimeoutSeconds = 60,
-    int pinBackgroundTimeoutSeconds = 120,
+    int authenticatedBackgroundTimeoutSeconds = 120,
+    @Deprecated(
+      'Use authenticatedBackgroundTimeoutSeconds instead. '
+      'This timeout applies to the authenticated session, not a specific PIN page.',
+    )
+    int? pinBackgroundTimeoutSeconds,
     bool enableForegroundCheck = true,
     bool enableEmulatorDetectionRelease = true,
     Widget Function(String message)? blockingScreenBuilder,
@@ -85,9 +90,12 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
     messageResolver,
     String Function(BuildContext context)? blockingTitleResolver,
   }) {
+    final int resolvedAuthenticatedBackgroundTimeoutSeconds =
+        pinBackgroundTimeoutSeconds ?? authenticatedBackgroundTimeoutSeconds;
     final Future<void> future = _performInit(
       otpBackgroundTimeoutSeconds: otpBackgroundTimeoutSeconds,
-      pinBackgroundTimeoutSeconds: pinBackgroundTimeoutSeconds,
+      authenticatedBackgroundTimeoutSeconds:
+          resolvedAuthenticatedBackgroundTimeoutSeconds,
       enableForegroundCheck: enableForegroundCheck,
       enableEmulatorDetectionRelease: enableEmulatorDetectionRelease,
       blockingScreenBuilder: blockingScreenBuilder,
@@ -145,9 +153,17 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
       return;
     }
     switch (state) {
-      case AppLifecycleState.hidden:
       case AppLifecycleState.inactive:
+        _setInactivePrivacyShield(active: _shouldShieldOnInactive);
+        final int nowMs = _nowProvider().millisecondsSinceEpoch;
+        _runtime
+          ..pausedAtMs = nowMs
+          ..logoutTriggeredForCurrentBackground = false;
+        unawaited(_persistLifecycleSnapshot(lastBackgroundedAtMs: nowMs));
+        break;
+      case AppLifecycleState.hidden:
       case AppLifecycleState.paused:
+        _setInactivePrivacyShield(active: false);
         final int nowMs = _nowProvider().millisecondsSinceEpoch;
         _runtime
           ..pausedAtMs = nowMs
@@ -155,11 +171,23 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
         unawaited(_persistLifecycleSnapshot(lastBackgroundedAtMs: nowMs));
         break;
       case AppLifecycleState.resumed:
+        _setInactivePrivacyShield(active: false);
         unawaited(_handleAppResumed());
         break;
       case AppLifecycleState.detached:
         break;
     }
+  }
+
+  bool get _shouldShieldOnInactive =>
+      defaultTargetPlatform == TargetPlatform.iOS;
+
+  void _setInactivePrivacyShield({required bool active}) {
+    if (_runtime.inactivePrivacyShieldActive == active) {
+      return;
+    }
+    _runtime.inactivePrivacyShieldActive = active;
+    _notifyListeners();
   }
 
   void _notifyListeners() => _notifier.emit();

@@ -153,7 +153,34 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('tap me'), findsNothing);
+    expect(find.text('tap me'), findsOneWidget);
     expect(tapped, 0);
   });
+
+  testWidgets(
+    'iOS inactive lifecycle conceals guarded content immediately',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: FlutterDefenderSensitiveGuard(
+            child: const Scaffold(body: Text('secret')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(defender.shouldConcealGuardedContent, isFalse);
+
+      defender.didChangeAppLifecycleState(AppLifecycleState.inactive);
+      await tester.pump();
+
+      expect(defender.shouldConcealGuardedContent, isTrue);
+
+      defender.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await tester.pump();
+
+      expect(defender.shouldConcealGuardedContent, isFalse);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
 }

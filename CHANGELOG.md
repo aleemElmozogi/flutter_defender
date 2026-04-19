@@ -14,8 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reworked Android overlay handling to use window hardening and obscured-touch interception instead of overlay-permission checks.
 - Persisted OTP/session background timeout state across process death.
 - Rebuilt the example app and README around the new guard-based API.
+- Added iOS privacy concealment while guarded routes are inactive, and documented it separately from true overlay protection.
+- Expanded the example app into a configuration profile lab for UI customization and policy toggles.
 
-## [0.2.0] - 2026-04-12
+## [0.2.0] - 2026-04-19
 
 ### Added
 
@@ -38,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Closed the first-frame leak where secure-window protection used to apply after navigation.
 - Stopped custom blocking builders from accidentally allowing interaction with the guarded UI.
 - Ensured background timeout state is enforced after cold launch.
+- Fixed guard registration so covered routes stop leaking protection onto later non-guarded screens.
+- Fixed guard layout so protected content can be used inside bottom sheets and other unconstrained containers.
 
 ## [0.0.1] - 2026-04-12
 

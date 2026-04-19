@@ -1,10 +1,6 @@
 part of '../../flutter_defender.dart';
 
 extension _FlutterDefenderBlockingUi on FlutterDefender {
-  Widget buildGuardPlaceholder() {
-    return ColoredBox(color: _config.uiTheme.backgroundColor);
-  }
-
   Widget buildBlockingOverlay(BuildContext context) {
     final FlutterDefenderMessageId? messageId =
         _runtime.blockingMessageId.value;

@@ -3,7 +3,7 @@ part of '../../flutter_defender.dart';
 extension _FlutterDefenderInit on FlutterDefender {
   Future<void> _performInit({
     required int otpBackgroundTimeoutSeconds,
-    required int pinBackgroundTimeoutSeconds,
+    required int authenticatedBackgroundTimeoutSeconds,
     required bool enableForegroundCheck,
     required bool enableEmulatorDetectionRelease,
     required Widget Function(String message)? blockingScreenBuilder,
@@ -17,7 +17,8 @@ extension _FlutterDefenderInit on FlutterDefender {
     _runtime.initInFlight = true;
     _config = FlutterDefenderConfig.fromInit(
       otpBackgroundTimeoutSeconds: otpBackgroundTimeoutSeconds,
-      pinBackgroundTimeoutSeconds: pinBackgroundTimeoutSeconds,
+      authenticatedBackgroundTimeoutSeconds:
+          authenticatedBackgroundTimeoutSeconds,
       enableForegroundCheck: enableForegroundCheck,
       enableEmulatorDetectionRelease: enableEmulatorDetectionRelease,
       blockingScreenBuilder: blockingScreenBuilder,

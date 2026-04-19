@@ -14,6 +14,11 @@ class ManualChecklistCard extends StatelessWidget {
         children: <Widget>[
           ChecklistLine(
             label:
+                'Apply Theme Override, Arabic Locale, and Message Resolvers profiles '
+                'before opening a guarded route so each customization can be seen.',
+          ),
+          ChecklistLine(
+            label:
                 'Sensitive screen: verify Android recents are protected and '
                 'recording or mirroring triggers blocking behavior.',
           ),
@@ -31,6 +36,10 @@ class ManualChecklistCard extends StatelessWidget {
             label:
                 'Custom blocking screen: trigger a block and confirm taps do not '
                 'reach the underlying route.',
+          ),
+          ChecklistLine(
+            label:
+                'Apply Foreground Check Off and Emulator Check Off profiles to compare policy behavior with those switches disabled.',
           ),
           ChecklistLine(
             label:

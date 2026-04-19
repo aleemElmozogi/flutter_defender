@@ -4,6 +4,8 @@ abstract class _FlutterDefenderGuardState<T extends StatefulWidget>
     extends State<T> {
   final Object _token = Object();
   bool _registrationReady = false;
+  bool _guardRegistered = false;
+  bool? _lastShouldGuard;
 
   FlutterDefender get defender => FlutterDefender.instance;
 
@@ -12,14 +14,31 @@ abstract class _FlutterDefenderGuardState<T extends StatefulWidget>
   Widget get guardedChild;
 
   Future<void> _register() async {
+    if (_guardRegistered) {
+      return;
+    }
     await defender.registerGuard(
       token: _token,
       type: guardType,
       popRoute: _popCurrentRoute,
     );
+    _guardRegistered = true;
     if (mounted) {
       setState(() {
         _registrationReady = true;
+      });
+    }
+  }
+
+  Future<void> _unregister() async {
+    if (!_guardRegistered) {
+      return;
+    }
+    _guardRegistered = false;
+    await defender.unregisterGuard(_token);
+    if (mounted) {
+      setState(() {
+        _registrationReady = false;
       });
     }
   }
@@ -37,32 +56,44 @@ abstract class _FlutterDefenderGuardState<T extends StatefulWidget>
   }
 
   @override
-  void initState() {
-    super.initState();
-    unawaited(_register());
+  void dispose() {
+    unawaited(_unregister());
+    super.dispose();
   }
 
-  @override
-  void dispose() {
-    unawaited(defender.unregisterGuard(_token));
-    super.dispose();
+  void _syncGuardRegistration(bool shouldGuard) {
+    if (_lastShouldGuard == shouldGuard) {
+      return;
+    }
+    _lastShouldGuard = shouldGuard;
+    if (shouldGuard) {
+      unawaited(_register());
+    } else {
+      unawaited(_unregister());
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool isRouteCurrent = ModalRoute.isCurrentOf(context) ?? true;
+    final bool isRouteActiveInTree = TickerMode.of(context);
+    final bool shouldGuard = isRouteCurrent && isRouteActiveInTree;
+    _syncGuardRegistration(shouldGuard);
+
     return AnimatedBuilder(
       animation: defender,
       builder: (BuildContext context, Widget? child) {
         final bool showChild =
-            _registrationReady && !defender.shouldConcealGuardedContent;
+            !shouldGuard ||
+            (_registrationReady && !defender.shouldConcealGuardedContent);
+        final Widget protectedChild = Opacity(
+          opacity: showChild ? 1 : 0,
+          child: guardedChild,
+        );
         return Stack(
-          fit: StackFit.expand,
+          fit: StackFit.passthrough,
           children: <Widget>[
-            Positioned.fill(
-              child: showChild
-                  ? guardedChild
-                  : defender.buildGuardPlaceholder(),
-            ),
+            protectedChild,
             if (defender.hasBlockingOverlay)
               Positioned.fill(child: defender.buildBlockingOverlay(context)),
           ],

@@ -4,7 +4,8 @@ This example is a manual feature lab for the plugin. It demonstrates:
 - sensitive screen protection with `FlutterDefenderSensitiveGuard`
 - OTP timeout behavior with `FlutterDefenderOtpGuard`
 - authenticated background logout via `setAuthenticated(true)`
-- custom blocking UI with a defender-owned barrier
+- iOS privacy concealment while guarded routes are inactive
+- runtime configuration profiles for blocking UI and policy switches
 - release emulator or simulator blocking on guarded routes
 
 ## Run
@@ -40,6 +41,7 @@ RUN_IOS_INTEGRATION=0 ./tool/run_tests.sh
 ## What the example includes
 
 - **Feature Lab home screen** with session state, event log, and direct entry points for each flow
+- **Configuration Profiles** for `blockingScreenBuilder`, `uiTheme`, `blockingLocale`, `messageResolver`, `blockingTitleResolver`, `enableForegroundCheck`, and `enableEmulatorDetectionRelease`
 - **Sensitive Screen** for Android recents and capture handling checks
 - **OTP Screen** for route-scoped timeout validation
 - **Authenticated Area** for full logout timeout validation
@@ -48,8 +50,10 @@ RUN_IOS_INTEGRATION=0 ./tool/run_tests.sh
 ## Recommended manual checks
 
 1. Open **Sensitive Screen** and verify Android recents are protected.
-2. Take a screenshot or start screen recording or mirroring and verify the plugin response matches the current platform limitations.
-3. Open **OTP Screen**, background the app for less than 10 seconds, then repeat for more than 10 seconds and confirm only the OTP route is dismissed.
-4. Sign in, open **Authenticated Area**, background for less than 20 seconds, then repeat for more than 20 seconds and confirm logout is requested.
-5. Open **Custom Blocking Screen Demo** and verify the underlying route is not tappable while blocked.
-6. Build a **release** on an emulator or simulator and verify guarded routes are blocked there while debug remains usable.
+2. On iOS, open **Sensitive Screen**, trigger Control Center, Notification Center, Siri, or the app switcher, and confirm guarded content is concealed while inactive.
+3. Take a screenshot or start screen recording or mirroring and verify the plugin response matches the current platform limitations.
+4. Apply the configuration profiles and confirm each one changes the guarded-route behavior it advertises.
+5. Open **OTP Screen**, background the app for less than 10 seconds, then repeat for more than 10 seconds and confirm only the OTP route is dismissed.
+6. Sign in, open **Authenticated Area**, background for less than 20 seconds, then repeat for more than 20 seconds and confirm logout is requested.
+7. Open **Custom Blocking Screen Demo** and verify the underlying route is not tappable while blocked.
+8. Build a **release** on an emulator or simulator and verify guarded routes are blocked there while debug remains usable.

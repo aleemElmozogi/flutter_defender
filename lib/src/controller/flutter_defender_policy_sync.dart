@@ -17,7 +17,7 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
       }
       if (_runtime.isAuthenticated &&
           !_runtime.logoutTriggeredForCurrentBackground &&
-          elapsedSeconds > _config.pinBackgroundTimeoutSeconds) {
+          elapsedSeconds > _config.authenticatedBackgroundTimeoutSeconds) {
         _runtime.logoutTriggeredForCurrentBackground = true;
         _config.onLogoutRequested?.call();
       }
@@ -39,7 +39,7 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
         snapshot.activeGuardKind ?? pigeon.DefenderGuardKind.none;
 
     if (wasAuthenticated &&
-        elapsedSeconds > _config.pinBackgroundTimeoutSeconds) {
+        elapsedSeconds > _config.authenticatedBackgroundTimeoutSeconds) {
       _config.onLogoutRequested?.call();
     }
     if (activeGuardKind == pigeon.DefenderGuardKind.otp &&
