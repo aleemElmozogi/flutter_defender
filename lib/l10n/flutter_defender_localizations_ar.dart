@@ -29,4 +29,16 @@ class FlutterDefenderLocalizationsAr extends FlutterDefenderLocalizations {
   @override
   String get foregroundRequired =>
       'يجب عدم مغادرة هذه الشاشة حتى اكتمال العملية.';
+
+  @override
+  String get rootOrJailbreakBlocked =>
+      'تم اكتشاف أن الجهاز معدل (روت/جيلبريك)، ولا يمكن عرض المحتوى المحمي.';
+
+  @override
+  String get proxyOrVpnBlocked =>
+      'استخدام VPN أو Proxy غير مسموح أثناء عرض هذا المحتوى المحمي.';
+
+  @override
+  String get tamperingBlocked =>
+      'تم اكتشاف محاولة عبث أو تصحيح للتطبيق أثناء التشغيل.';
 }

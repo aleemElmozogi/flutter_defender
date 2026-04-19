@@ -5,5 +5,8 @@
   "screenshotsBlocked": "Security Policy: Screenshots are not allowed on sensitive screens.",
   "overlaysBlocked": "Security Policy: Screen overlays are not allowed while sensitive content is visible.",
   "screenCaptureBlocked": "Security Policy: Screen recording or mirroring is not allowed.",
-  "foregroundRequired": "Security Policy: Sensitive screens require the app to remain in the foreground."
+  "foregroundRequired": "Security Policy: Sensitive screens require the app to remain in the foreground.",
+  "rootOrJailbreakBlocked": "Security Policy: This device security posture is not trusted (root/jailbreak detected).",
+  "proxyOrVpnBlocked": "Security Policy: Proxy or VPN usage is not allowed for this protected screen.",
+  "tamperingBlocked": "Security Policy: Runtime tampering or debugging was detected."
 }

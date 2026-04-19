@@ -15,11 +15,7 @@ PlatformException _createConnectionError(String channelName) {
   );
 }
 
-List<Object?> wrapResponse({
-  Object? result,
-  PlatformException? error,
-  bool empty = false,
-}) {
+List<Object?> wrapResponse({Object? result, PlatformException? error, bool empty = false}) {
   if (empty) {
     return <Object?>[];
   }
@@ -29,7 +25,11 @@ List<Object?> wrapResponse({
   return <Object?>[error.code, error.message, error.details];
 }
 
-enum DefenderGuardKind { none, sensitive, otp }
+enum DefenderGuardKind {
+  none,
+  sensitive,
+  otp,
+}
 
 class NativeRuntimeState {
   NativeRuntimeState({
@@ -81,7 +81,11 @@ class LifecycleSnapshot {
   DefenderGuardKind? activeGuardKind;
 
   Object encode() {
-    return <Object?>[lastBackgroundedAtMs, wasAuthenticated, activeGuardKind];
+    return <Object?>[
+      lastBackgroundedAtMs,
+      wasAuthenticated,
+      activeGuardKind,
+    ];
   }
 
   static LifecycleSnapshot decode(Object result) {
@@ -94,6 +98,53 @@ class LifecycleSnapshot {
   }
 }
 
+class AdvancedSecuritySignals {
+  AdvancedSecuritySignals({
+    this.rootedOrJailbroken,
+    this.proxyEnabled,
+    this.vpnEnabled,
+    this.debuggerAttached,
+    this.tamperingDetected,
+    this.tamperingDetails,
+  });
+
+  bool? rootedOrJailbroken;
+
+  bool? proxyEnabled;
+
+  bool? vpnEnabled;
+
+  bool? debuggerAttached;
+
+  bool? tamperingDetected;
+
+  String? tamperingDetails;
+
+  Object encode() {
+    return <Object?>[
+      rootedOrJailbroken,
+      proxyEnabled,
+      vpnEnabled,
+      debuggerAttached,
+      tamperingDetected,
+      tamperingDetails,
+    ];
+  }
+
+  static AdvancedSecuritySignals decode(Object result) {
+    result as List<Object?>;
+    return AdvancedSecuritySignals(
+      rootedOrJailbroken: result[0] as bool?,
+      proxyEnabled: result[1] as bool?,
+      vpnEnabled: result[2] as bool?,
+      debuggerAttached: result[3] as bool?,
+      tamperingDetected: result[4] as bool?,
+      tamperingDetails: result[5] as String?,
+    );
+  }
+}
+
+
 class _PigeonCodec extends StandardMessageCodec {
   const _PigeonCodec();
   @override
@@ -101,14 +152,17 @@ class _PigeonCodec extends StandardMessageCodec {
     if (value is int) {
       buffer.putUint8(4);
       buffer.putInt64(value);
-    } else if (value is DefenderGuardKind) {
+    }    else if (value is DefenderGuardKind) {
       buffer.putUint8(129);
       writeValue(buffer, value.index);
-    } else if (value is NativeRuntimeState) {
+    }    else if (value is NativeRuntimeState) {
       buffer.putUint8(130);
       writeValue(buffer, value.encode());
-    } else if (value is LifecycleSnapshot) {
+    }    else if (value is LifecycleSnapshot) {
       buffer.putUint8(131);
+      writeValue(buffer, value.encode());
+    }    else if (value is AdvancedSecuritySignals) {
+      buffer.putUint8(132);
       writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
@@ -118,13 +172,15 @@ class _PigeonCodec extends StandardMessageCodec {
   @override
   Object? readValueOfType(int type, ReadBuffer buffer) {
     switch (type) {
-      case 129:
+      case 129: 
         final int? value = readValue(buffer) as int?;
         return value == null ? null : DefenderGuardKind.values[value];
-      case 130:
+      case 130: 
         return NativeRuntimeState.decode(readValue(buffer)!);
-      case 131:
+      case 131: 
         return LifecycleSnapshot.decode(readValue(buffer)!);
+      case 132: 
+        return AdvancedSecuritySignals.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
     }
@@ -135,34 +191,23 @@ class DefenderHostApi {
   /// Constructor for [DefenderHostApi].  The [binaryMessenger] named argument is
   /// available for dependency injection.  If it is left null, the default
   /// BinaryMessenger will be used which routes to the host platform.
-  DefenderHostApi({
-    BinaryMessenger? binaryMessenger,
-    String messageChannelSuffix = '',
-  }) : pigeonVar_binaryMessenger = binaryMessenger,
-       pigeonVar_messageChannelSuffix = messageChannelSuffix.isNotEmpty
-           ? '.$messageChannelSuffix'
-           : '';
+  DefenderHostApi({BinaryMessenger? binaryMessenger, String messageChannelSuffix = ''})
+      : pigeonVar_binaryMessenger = binaryMessenger,
+        pigeonVar_messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
   final BinaryMessenger? pigeonVar_binaryMessenger;
 
   static const MessageCodec<Object?> pigeonChannelCodec = _PigeonCodec();
 
   final String pigeonVar_messageChannelSuffix;
 
-  Future<void> setProtectionState(
-    bool secureActive,
-    bool overlayHardeningActive,
-  ) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.flutter_defender.DefenderHostApi.setProtectionState$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
-          pigeonVar_channelName,
-          pigeonChannelCodec,
-          binaryMessenger: pigeonVar_binaryMessenger,
-        );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
-      <Object?>[secureActive, overlayHardeningActive],
+  Future<void> setProtectionState(bool secureActive, bool overlayHardeningActive) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.flutter_defender.DefenderHostApi.setProtectionState$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
     );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[secureActive, overlayHardeningActive]);
     final List<Object?>? pigeonVar_replyList =
         await pigeonVar_sendFuture as List<Object?>?;
     if (pigeonVar_replyList == null) {
@@ -179,14 +224,12 @@ class DefenderHostApi {
   }
 
   Future<NativeRuntimeState> getRuntimeState() async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.flutter_defender.DefenderHostApi.getRuntimeState$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
-          pigeonVar_channelName,
-          pigeonChannelCodec,
-          binaryMessenger: pigeonVar_binaryMessenger,
-        );
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.flutter_defender.DefenderHostApi.getRuntimeState$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
     final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
     final List<Object?>? pigeonVar_replyList =
         await pigeonVar_sendFuture as List<Object?>?;
@@ -208,18 +251,134 @@ class DefenderHostApi {
     }
   }
 
-  Future<void> saveLifecycleSnapshot(LifecycleSnapshot snapshot) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.flutter_defender.DefenderHostApi.saveLifecycleSnapshot$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
-          pigeonVar_channelName,
-          pigeonChannelCodec,
-          binaryMessenger: pigeonVar_binaryMessenger,
-        );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
-      <Object?>[snapshot],
+  Future<AdvancedSecuritySignals> getAdvancedSecuritySignals() async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.flutter_defender.DefenderHostApi.getAdvancedSecuritySignals$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
     );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as AdvancedSecuritySignals?)!;
+    }
+  }
+
+  Future<void> secureWrite(String key, String value) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.flutter_defender.DefenderHostApi.secureWrite$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[key, value]);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
+    }
+  }
+
+  Future<String?> secureRead(String key) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.flutter_defender.DefenderHostApi.secureRead$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[key]);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return (pigeonVar_replyList[0] as String?);
+    }
+  }
+
+  Future<void> secureDelete(String key) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.flutter_defender.DefenderHostApi.secureDelete$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[key]);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
+    }
+  }
+
+  Future<void> secureClearAll() async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.flutter_defender.DefenderHostApi.secureClearAll$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
+    }
+  }
+
+  Future<void> saveLifecycleSnapshot(LifecycleSnapshot snapshot) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.flutter_defender.DefenderHostApi.saveLifecycleSnapshot$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[snapshot]);
     final List<Object?>? pigeonVar_replyList =
         await pigeonVar_sendFuture as List<Object?>?;
     if (pigeonVar_replyList == null) {
@@ -236,14 +395,12 @@ class DefenderHostApi {
   }
 
   Future<LifecycleSnapshot> loadLifecycleSnapshot() async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.flutter_defender.DefenderHostApi.loadLifecycleSnapshot$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
-          pigeonVar_channelName,
-          pigeonChannelCodec,
-          binaryMessenger: pigeonVar_binaryMessenger,
-        );
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.flutter_defender.DefenderHostApi.loadLifecycleSnapshot$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
     final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
     final List<Object?>? pigeonVar_replyList =
         await pigeonVar_sendFuture as List<Object?>?;
@@ -266,14 +423,12 @@ class DefenderHostApi {
   }
 
   Future<void> clearLifecycleSnapshot() async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.flutter_defender.DefenderHostApi.clearLifecycleSnapshot$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
-          pigeonVar_channelName,
-          pigeonChannelCodec,
-          binaryMessenger: pigeonVar_binaryMessenger,
-        );
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.flutter_defender.DefenderHostApi.clearLifecycleSnapshot$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
     final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
     final List<Object?>? pigeonVar_replyList =
         await pigeonVar_sendFuture as List<Object?>?;
@@ -302,21 +457,12 @@ abstract class DefenderFlutterApi {
 
   void onForegroundStateChanged(bool active);
 
-  static void setUp(
-    DefenderFlutterApi? api, {
-    BinaryMessenger? binaryMessenger,
-    String messageChannelSuffix = '',
-  }) {
-    messageChannelSuffix = messageChannelSuffix.isNotEmpty
-        ? '.$messageChannelSuffix'
-        : '';
+  static void setUp(DefenderFlutterApi? api, {BinaryMessenger? binaryMessenger, String messageChannelSuffix = '',}) {
+    messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
     {
-      final BasicMessageChannel<Object?>
-      pigeonVar_channel = BasicMessageChannel<Object?>(
-        'dev.flutter.pigeon.flutter_defender.DefenderFlutterApi.onScreenshotDetected$messageChannelSuffix',
-        pigeonChannelCodec,
-        binaryMessenger: binaryMessenger,
-      );
+      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+          'dev.flutter.pigeon.flutter_defender.DefenderFlutterApi.onScreenshotDetected$messageChannelSuffix', pigeonChannelCodec,
+          binaryMessenger: binaryMessenger);
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
@@ -326,55 +472,41 @@ abstract class DefenderFlutterApi {
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          } catch (e) {
-            return wrapResponse(
-              error: PlatformException(code: 'error', message: e.toString()),
-            );
+          }          catch (e) {
+            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
           }
         });
       }
     }
     {
-      final BasicMessageChannel<Object?>
-      pigeonVar_channel = BasicMessageChannel<Object?>(
-        'dev.flutter.pigeon.flutter_defender.DefenderFlutterApi.onScreenCaptureChanged$messageChannelSuffix',
-        pigeonChannelCodec,
-        binaryMessenger: binaryMessenger,
-      );
+      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+          'dev.flutter.pigeon.flutter_defender.DefenderFlutterApi.onScreenCaptureChanged$messageChannelSuffix', pigeonChannelCodec,
+          binaryMessenger: binaryMessenger);
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
         pigeonVar_channel.setMessageHandler((Object? message) async {
-          assert(
-            message != null,
-            'Argument for dev.flutter.pigeon.flutter_defender.DefenderFlutterApi.onScreenCaptureChanged was null.',
-          );
+          assert(message != null,
+          'Argument for dev.flutter.pigeon.flutter_defender.DefenderFlutterApi.onScreenCaptureChanged was null.');
           final List<Object?> args = (message as List<Object?>?)!;
           final bool? arg_active = (args[0] as bool?);
-          assert(
-            arg_active != null,
-            'Argument for dev.flutter.pigeon.flutter_defender.DefenderFlutterApi.onScreenCaptureChanged was null, expected non-null bool.',
-          );
+          assert(arg_active != null,
+              'Argument for dev.flutter.pigeon.flutter_defender.DefenderFlutterApi.onScreenCaptureChanged was null, expected non-null bool.');
           try {
             api.onScreenCaptureChanged(arg_active!);
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          } catch (e) {
-            return wrapResponse(
-              error: PlatformException(code: 'error', message: e.toString()),
-            );
+          }          catch (e) {
+            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
           }
         });
       }
     }
     {
-      final BasicMessageChannel<Object?>
-      pigeonVar_channel = BasicMessageChannel<Object?>(
-        'dev.flutter.pigeon.flutter_defender.DefenderFlutterApi.onOverlayViolation$messageChannelSuffix',
-        pigeonChannelCodec,
-        binaryMessenger: binaryMessenger,
-      );
+      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+          'dev.flutter.pigeon.flutter_defender.DefenderFlutterApi.onOverlayViolation$messageChannelSuffix', pigeonChannelCodec,
+          binaryMessenger: binaryMessenger);
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
@@ -384,44 +516,33 @@ abstract class DefenderFlutterApi {
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          } catch (e) {
-            return wrapResponse(
-              error: PlatformException(code: 'error', message: e.toString()),
-            );
+          }          catch (e) {
+            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
           }
         });
       }
     }
     {
-      final BasicMessageChannel<Object?>
-      pigeonVar_channel = BasicMessageChannel<Object?>(
-        'dev.flutter.pigeon.flutter_defender.DefenderFlutterApi.onForegroundStateChanged$messageChannelSuffix',
-        pigeonChannelCodec,
-        binaryMessenger: binaryMessenger,
-      );
+      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+          'dev.flutter.pigeon.flutter_defender.DefenderFlutterApi.onForegroundStateChanged$messageChannelSuffix', pigeonChannelCodec,
+          binaryMessenger: binaryMessenger);
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
         pigeonVar_channel.setMessageHandler((Object? message) async {
-          assert(
-            message != null,
-            'Argument for dev.flutter.pigeon.flutter_defender.DefenderFlutterApi.onForegroundStateChanged was null.',
-          );
+          assert(message != null,
+          'Argument for dev.flutter.pigeon.flutter_defender.DefenderFlutterApi.onForegroundStateChanged was null.');
           final List<Object?> args = (message as List<Object?>?)!;
           final bool? arg_active = (args[0] as bool?);
-          assert(
-            arg_active != null,
-            'Argument for dev.flutter.pigeon.flutter_defender.DefenderFlutterApi.onForegroundStateChanged was null, expected non-null bool.',
-          );
+          assert(arg_active != null,
+              'Argument for dev.flutter.pigeon.flutter_defender.DefenderFlutterApi.onForegroundStateChanged was null, expected non-null bool.');
           try {
             api.onForegroundStateChanged(arg_active!);
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          } catch (e) {
-            return wrapResponse(
-              error: PlatformException(code: 'error', message: e.toString()),
-            );
+          }          catch (e) {
+            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
           }
         });
       }

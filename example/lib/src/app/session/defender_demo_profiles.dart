@@ -8,12 +8,21 @@ enum DefenderDemoProfile {
   resolverOverrides,
   foregroundCheckDisabled,
   emulatorCheckDisabled,
+  rootDetectionOn,
+  proxyVpnDetectionOn,
+  raspDetectionOn,
+  secureStorageHelperOn,
 }
 
 class DefenderDemoProfileConfig {
   const DefenderDemoProfileConfig({
     this.enableForegroundCheck = true,
     this.enableEmulatorDetectionRelease = true,
+    this.enableRootDetection = false,
+    this.enableProxyVpnDetection = false,
+    this.enableRaspDetection = false,
+    this.enableSecureStorageHelper = false,
+    this.clearSecureStorageOnLogout = false,
     this.blockingScreenBuilder,
     this.uiTheme = FlutterDefenderUiTheme.defaults,
     this.blockingLocale,
@@ -23,6 +32,11 @@ class DefenderDemoProfileConfig {
 
   final bool enableForegroundCheck;
   final bool enableEmulatorDetectionRelease;
+  final bool enableRootDetection;
+  final bool enableProxyVpnDetection;
+  final bool enableRaspDetection;
+  final bool enableSecureStorageHelper;
+  final bool clearSecureStorageOnLogout;
   final Widget Function(String message)? blockingScreenBuilder;
   final FlutterDefenderUiTheme uiTheme;
   final Locale? blockingLocale;
@@ -40,6 +54,10 @@ extension DefenderDemoProfilePresentation on DefenderDemoProfile {
       DefenderDemoProfile.resolverOverrides => 'Message Resolvers',
       DefenderDemoProfile.foregroundCheckDisabled => 'Foreground Check Off',
       DefenderDemoProfile.emulatorCheckDisabled => 'Emulator Check Off',
+      DefenderDemoProfile.rootDetectionOn => 'Root/Jailbreak On',
+      DefenderDemoProfile.proxyVpnDetectionOn => 'Proxy/VPN On',
+      DefenderDemoProfile.raspDetectionOn => 'RASP On',
+      DefenderDemoProfile.secureStorageHelperOn => 'Secure Storage On',
     };
   }
 
@@ -57,6 +75,14 @@ extension DefenderDemoProfilePresentation on DefenderDemoProfile {
         'Disables foreground-required blocking so guarded routes can be compared with and without that policy.',
       DefenderDemoProfile.emulatorCheckDisabled =>
         'Disables release emulator blocking to verify that policy switch independently.',
+      DefenderDemoProfile.rootDetectionOn =>
+        'Enables root/jailbreak checks in guarded routes.',
+      DefenderDemoProfile.proxyVpnDetectionOn =>
+        'Enables proxy and VPN checks in guarded routes.',
+      DefenderDemoProfile.raspDetectionOn =>
+        'Enables debugger and tampering checks (basic RASP).',
+      DefenderDemoProfile.secureStorageHelperOn =>
+        'Enables secure storage helper and clears stored values on logout.',
     };
   }
 
@@ -74,6 +100,14 @@ extension DefenderDemoProfilePresentation on DefenderDemoProfile {
         'Compare a guarded route before and after backgrounding or focus changes to verify the foreground policy toggle.',
       DefenderDemoProfile.emulatorCheckDisabled =>
         'In a release build on emulator or simulator, compare guarded-route behavior before and after applying this profile.',
+      DefenderDemoProfile.rootDetectionOn =>
+        'Use a rooted/jailbroken test device (or emulator with root artifacts) and verify the guarded route is blocked.',
+      DefenderDemoProfile.proxyVpnDetectionOn =>
+        'Enable a VPN or device proxy and verify guarded routes are blocked.',
+      DefenderDemoProfile.raspDetectionOn =>
+        'Attach debugger in release-like validation and verify guarded routes are blocked.',
+      DefenderDemoProfile.secureStorageHelperOn =>
+        'Store then clear a value using the helper, then sign out and verify values are removed.',
     };
   }
 
@@ -96,6 +130,19 @@ extension DefenderDemoProfilePresentation on DefenderDemoProfile {
         const DefenderDemoProfileConfig(enableForegroundCheck: false),
       DefenderDemoProfile.emulatorCheckDisabled =>
         const DefenderDemoProfileConfig(enableEmulatorDetectionRelease: false),
+      DefenderDemoProfile.rootDetectionOn => const DefenderDemoProfileConfig(
+        enableRootDetection: true,
+      ),
+      DefenderDemoProfile.proxyVpnDetectionOn =>
+        const DefenderDemoProfileConfig(enableProxyVpnDetection: true),
+      DefenderDemoProfile.raspDetectionOn => const DefenderDemoProfileConfig(
+        enableRaspDetection: true,
+      ),
+      DefenderDemoProfile.secureStorageHelperOn =>
+        const DefenderDemoProfileConfig(
+          enableSecureStorageHelper: true,
+          clearSecureStorageOnLogout: true,
+        ),
     };
   }
 }
@@ -172,5 +219,11 @@ String _resolveBlockingMessage(
       'Resolver demo: screen recording or mirroring is blocked here.',
     FlutterDefenderMessageId.foregroundRequired =>
       'Resolver demo: this protected route must stay in the foreground.',
+    FlutterDefenderMessageId.rootOrJailbreakBlocked =>
+      'Resolver demo: rooted or jailbroken devices are blocked by policy.',
+    FlutterDefenderMessageId.proxyOrVpnBlocked =>
+      'Resolver demo: proxy or VPN usage is blocked on this route.',
+    FlutterDefenderMessageId.tamperingBlocked =>
+      'Resolver demo: runtime tampering or debugger attachment was detected.',
   };
 }

@@ -19,6 +19,10 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
           !_runtime.logoutTriggeredForCurrentBackground &&
           elapsedSeconds > _config.authenticatedBackgroundTimeoutSeconds) {
         _runtime.logoutTriggeredForCurrentBackground = true;
+        if (_config.enableSecureStorageHelper &&
+            _config.clearSecureStorageOnLogout) {
+          await _safeSecureClearAll();
+        }
         _config.onLogoutRequested?.call();
       }
     }
@@ -85,6 +89,22 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
       return;
     }
     _applyRuntimeState(runtimeState);
+    if (hasGuards &&
+        (_config.enableRootDetection ||
+            _config.enableProxyVpnDetection ||
+            _config.enableRaspDetection)) {
+      final pigeon.AdvancedSecuritySignals signals =
+          await _safeGetAdvancedSecuritySignals();
+      if (generation != _syncGeneration) {
+        return;
+      }
+      _applyAdvancedSecuritySignals(signals);
+    } else {
+      _runtime
+        ..rootBlocked = false
+        ..proxyOrVpnBlocked = false
+        ..tamperingBlocked = false;
+    }
 
     if (!hasGuards) {
       _clearBlockingState();
@@ -105,6 +125,42 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
         kReleaseMode &&
         _config.enableEmulatorDetectionRelease &&
         (runtimeState.isEmulator ?? false);
+  }
+
+  void _applyAdvancedSecuritySignals(pigeon.AdvancedSecuritySignals signals) {
+    final bool rootDetected = signals.rootedOrJailbroken ?? false;
+    final bool proxyOrVpnDetected =
+        (signals.proxyEnabled ?? false) || (signals.vpnEnabled ?? false);
+    final bool tamperingDetected =
+        (signals.debuggerAttached ?? false) ||
+        (signals.tamperingDetected ?? false);
+
+    _runtime.rootBlocked = _config.enableRootDetection && rootDetected;
+    _runtime.proxyOrVpnBlocked =
+        _config.enableProxyVpnDetection && proxyOrVpnDetected;
+    _runtime.tamperingBlocked =
+        _config.enableRaspDetection && tamperingDetected;
+
+    if (_runtime.rootBlocked && !_runtime.rootCallbackEmitted) {
+      _runtime.rootCallbackEmitted = true;
+      _config.onRootDetected?.call();
+    } else if (!_runtime.rootBlocked) {
+      _runtime.rootCallbackEmitted = false;
+    }
+
+    if (_runtime.proxyOrVpnBlocked && !_runtime.proxyVpnCallbackEmitted) {
+      _runtime.proxyVpnCallbackEmitted = true;
+      _config.onProxyOrVpnDetected?.call();
+    } else if (!_runtime.proxyOrVpnBlocked) {
+      _runtime.proxyVpnCallbackEmitted = false;
+    }
+
+    if (_runtime.tamperingBlocked && !_runtime.tamperingCallbackEmitted) {
+      _runtime.tamperingCallbackEmitted = true;
+      _config.onTamperingDetected?.call();
+    } else if (!_runtime.tamperingBlocked) {
+      _runtime.tamperingCallbackEmitted = false;
+    }
   }
 
   void _handleScreenshotDetected() {

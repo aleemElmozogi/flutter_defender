@@ -49,6 +49,31 @@ class PigeonFlutterDefenderPlatform extends FlutterDefenderPlatform {
   }
 
   @override
+  Future<AdvancedSecuritySignals> getAdvancedSecuritySignals() {
+    return _hostApi.getAdvancedSecuritySignals();
+  }
+
+  @override
+  Future<void> secureWrite({required String key, required String value}) {
+    return _hostApi.secureWrite(key, value);
+  }
+
+  @override
+  Future<String?> secureRead(String key) {
+    return _hostApi.secureRead(key);
+  }
+
+  @override
+  Future<void> secureDelete(String key) {
+    return _hostApi.secureDelete(key);
+  }
+
+  @override
+  Future<void> secureClearAll() {
+    return _hostApi.secureClearAll();
+  }
+
+  @override
   Future<void> saveLifecycleSnapshot(LifecycleSnapshot snapshot) {
     return _hostApi.saveLifecycleSnapshot(snapshot);
   }

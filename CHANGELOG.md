@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Optional root/jailbreak detection layer with `enableRootDetection` and `onRootDetected`.
+- Optional proxy/VPN detection layer with `enableProxyVpnDetection` and `onProxyOrVpnDetected`.
+- Optional basic RASP checks (debugger/hooking) with `enableRaspDetection` and `onTamperingDetected`.
+- Optional secure storage helper (`secureWrite`, `secureRead`, `secureDelete`, `secureClearAll`) with `enableSecureStorageHelper`.
+- Optional secure-storage lifecycle cleanup via `clearSecureStorageOnLogout`.
+- New blocking message IDs and localized strings for root/jailbreak, proxy/VPN, and tampering detections.
+
 ### Changed
 
 - Moved the package to explicit guarded screens with `FlutterDefenderSensitiveGuard` and `FlutterDefenderOtpGuard`.
@@ -17,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added iOS privacy concealment while guarded routes are inactive, and documented it separately from true overlay protection.
 - Expanded the example app into a configuration profile lab for UI customization and policy toggles.
 - Added GitHub Actions workflows for PR/main CI, release tag creation on version bumps, and tag-triggered pub.dev publishing.
+- Repositioned package docs from banking-specific wording to general-purpose sensitive-data app protection.
 
 ## [0.2.0] - 2026-04-19
 

@@ -6,6 +6,8 @@ This example is a manual feature lab for the plugin. It demonstrates:
 - authenticated background logout via `setAuthenticated(true)`
 - iOS privacy concealment while guarded routes are inactive
 - runtime configuration profiles for blocking UI and policy switches
+- advanced-layer toggles for root/jailbreak, proxy/VPN, and RASP checks
+- secure storage helper demo flow
 - release emulator or simulator blocking on guarded routes
 
 ## Run
@@ -41,7 +43,7 @@ RUN_IOS_INTEGRATION=0 ./tool/run_tests.sh
 ## What the example includes
 
 - **Feature Lab home screen** with session state, event log, and direct entry points for each flow
-- **Configuration Profiles** for `blockingScreenBuilder`, `uiTheme`, `blockingLocale`, `messageResolver`, `blockingTitleResolver`, `enableForegroundCheck`, and `enableEmulatorDetectionRelease`
+- **Configuration Profiles** for `blockingScreenBuilder`, `uiTheme`, `blockingLocale`, `messageResolver`, `blockingTitleResolver`, `enableForegroundCheck`, `enableEmulatorDetectionRelease`, `enableRootDetection`, `enableProxyVpnDetection`, `enableRaspDetection`, and `enableSecureStorageHelper`
 - **Sensitive Screen** for Android recents and capture handling checks
 - **OTP Screen** for route-scoped timeout validation
 - **Authenticated Area** for full logout timeout validation
@@ -56,4 +58,5 @@ RUN_IOS_INTEGRATION=0 ./tool/run_tests.sh
 5. Open **OTP Screen**, background the app for less than 10 seconds, then repeat for more than 10 seconds and confirm only the OTP route is dismissed.
 6. Sign in, open **Authenticated Area**, background for less than 20 seconds, then repeat for more than 20 seconds and confirm logout is requested.
 7. Open **Custom Blocking Screen Demo** and verify the underlying route is not tappable while blocked.
-8. Build a **release** on an emulator or simulator and verify guarded routes are blocked there while debug remains usable.
+8. Apply the advanced security profiles and validate expected blocking behavior on matching device/network conditions.
+9. Build a **release** on an emulator or simulator and verify guarded routes are blocked there while debug remains usable.

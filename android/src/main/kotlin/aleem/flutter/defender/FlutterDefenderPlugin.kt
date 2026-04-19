@@ -11,8 +11,11 @@ import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 
 class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
     private var activity: Activity? = null
+    private var applicationContext: android.content.Context? = null
     private var flutterApi: DefenderFlutterApi? = null
     private var snapshotStore: LifecycleSnapshotStore? = null
+    private var advancedSecurityDetector: AdvancedSecurityDetector? = null
+    private var secureStorageHelper: SecureStorageHelper? = null
     private var screenCaptureCallbackHandle: Any? = null
     private var windowFocusListener: ViewTreeObserver.OnWindowFocusChangeListener? = null
     private var windowCallbackWrapper: OverlayAwareWindowCallback? = null
@@ -20,7 +23,10 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
     private var overlayHardeningActive = false
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        applicationContext = binding.applicationContext
         snapshotStore = LifecycleSnapshotStore(binding.applicationContext)
+        advancedSecurityDetector = AdvancedSecurityDetector(binding.applicationContext)
+        secureStorageHelper = SecureStorageHelper(binding.applicationContext)
         flutterApi = DefenderFlutterApi(binding.binaryMessenger)
         DefenderHostApi.setUp(binding.binaryMessenger, this)
     }
@@ -32,6 +38,9 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
         restoreWindowCallback()
         flutterApi = null
         snapshotStore = null
+        secureStorageHelper = null
+        advancedSecurityDetector = null
+        applicationContext = null
     }
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
@@ -61,6 +70,33 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
             isEmulator = EmulatorDetector.isEmulator(),
             supportsOverlayHardening = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
         )
+    }
+
+    override fun getAdvancedSecuritySignals(): AdvancedSecuritySignals {
+        return advancedSecurityDetector?.collectSignals() ?: AdvancedSecuritySignals(
+            rootedOrJailbroken = false,
+            proxyEnabled = false,
+            vpnEnabled = false,
+            debuggerAttached = false,
+            tamperingDetected = false,
+            tamperingDetails = null
+        )
+    }
+
+    override fun secureWrite(key: String, value: String) {
+        secureStorageHelper?.write(key, value)
+    }
+
+    override fun secureRead(key: String): String? {
+        return secureStorageHelper?.read(key)
+    }
+
+    override fun secureDelete(key: String) {
+        secureStorageHelper?.delete(key)
+    }
+
+    override fun secureClearAll() {
+        secureStorageHelper?.clearAll()
     }
 
     override fun saveLifecycleSnapshot(snapshot: LifecycleSnapshot) {

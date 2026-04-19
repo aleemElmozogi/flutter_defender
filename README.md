@@ -2,7 +2,8 @@
 
 Secure-screen protection for Flutter apps on Android and iOS.
 
-`flutter_defender` is built for banking-style flows where guarded screens must:
+`flutter_defender` is a general security layer for apps that handle sensitive
+data (finance, healthcare, enterprise, identity, and more). Guarded screens can:
 - hide Android recents/screenshot content with `FLAG_SECURE`
 - react to screenshot and live-capture events
 - conceal sensitive content immediately when iOS loses focus
@@ -90,12 +91,63 @@ Options:
 - `authenticatedBackgroundTimeoutSeconds`
 - `enableForegroundCheck`
 - `enableEmulatorDetectionRelease`
+- `enableRootDetection` (defaults to `true` in release, `false` in debug/profile)
+- `enableProxyVpnDetection` (defaults to `true` in release, `false` in debug/profile)
+- `enableRaspDetection` (defaults to `true` in release, `false` in debug/profile)
+- `enableSecureStorageHelper` (default `false`)
+- `clearSecureStorageOnLogout` (default `false`)
 - `onLogoutRequested`
+- `onRootDetected`
+- `onProxyOrVpnDetected`
+- `onTamperingDetected`
 - `blockingScreenBuilder`
 - `uiTheme`
 - `blockingLocale`
 - `messageResolver`
 - `blockingTitleResolver`
+
+## Advanced Security Layers
+
+All advanced layers are optional and configured at `init`.
+
+### Root / Jailbreak Detection
+
+- Android checks common root indicators (for example `su`, Magisk paths, `test-keys`).
+- iOS checks common jailbreak indicators (for example Cydia paths and sandbox write escape).
+- Callback: `onRootDetected`
+- Policy toggle: `enableRootDetection`
+
+### Proxy / VPN Detection
+
+- Detects active proxy settings and VPN transport/interface indicators.
+- Callback: `onProxyOrVpnDetected`
+- Policy toggle: `enableProxyVpnDetection`
+
+### Basic RASP
+
+- Detects debugger attachment and common hooking artifacts (best-effort).
+- Callback: `onTamperingDetected`
+- Policy toggle: `enableRaspDetection`
+
+### Secure Storage Helper (Optional)
+
+- Provides convenience secure key/value methods backed by:
+  - Android: Keystore-backed encrypted shared preferences
+  - iOS: Keychain
+- Toggle: `enableSecureStorageHelper`
+- Optional lifecycle integration: `clearSecureStorageOnLogout`
+
+```dart
+await FlutterDefender.instance.init(
+  enableSecureStorageHelper: true,
+  clearSecureStorageOnLogout: true,
+);
+
+await FlutterDefender.instance.secureWrite(key: 'token', value: 'abc');
+final token = await FlutterDefender.instance.secureRead('token');
+await FlutterDefender.instance.secureDelete('token');
+await FlutterDefender.instance.secureClearAll();
+```
 
 ### `FlutterDefenderSensitiveGuard`
 
@@ -143,6 +195,10 @@ await FlutterDefender.instance.init(
 | Conceal on focus loss (`inactive`) | Lifecycle-driven concealment | Yes, hides guarded content immediately |
 | Overlay protection | Mitigation-based hardening | Not supported |
 | Emulator / simulator release block | Yes | Yes |
+| Root / jailbreak detection | Yes (best-effort indicators) | Yes (best-effort indicators) |
+| Proxy / VPN detection | Yes | Yes |
+| Basic RASP (debugger / hooking) | Yes | Yes |
+| Secure storage helper | Yes (Keystore-backed) | Yes (Keychain-backed) |
 
 Important limitations:
 - **Android overlay defense is mitigation-based.** The plugin hardens guarded screens and reports obscured-touch violations; it does not claim perfect detection of every hostile overlay.
@@ -186,6 +242,7 @@ The `example/` app demonstrates:
 - authenticated timeout wiring
 - blocking UI customization profiles (`blockingScreenBuilder`, `uiTheme`, `blockingLocale`, `messageResolver`, `blockingTitleResolver`)
 - policy toggle profiles for `enableForegroundCheck` and `enableEmulatorDetectionRelease`
+- advanced-layer profiles for root/jailbreak, proxy/VPN, RASP, and secure storage helper
 - manual validation steps for release emulator/simulator checks and capture handling
 
 Run it with:

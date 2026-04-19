@@ -134,6 +134,46 @@ struct LifecycleSnapshot {
   }
 }
 
+/// Generated class from Pigeon that represents data sent in messages.
+struct AdvancedSecuritySignals {
+  var rootedOrJailbroken: Bool? = nil
+  var proxyEnabled: Bool? = nil
+  var vpnEnabled: Bool? = nil
+  var debuggerAttached: Bool? = nil
+  var tamperingDetected: Bool? = nil
+  var tamperingDetails: String? = nil
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> AdvancedSecuritySignals? {
+    let rootedOrJailbroken: Bool? = nilOrValue(pigeonVar_list[0])
+    let proxyEnabled: Bool? = nilOrValue(pigeonVar_list[1])
+    let vpnEnabled: Bool? = nilOrValue(pigeonVar_list[2])
+    let debuggerAttached: Bool? = nilOrValue(pigeonVar_list[3])
+    let tamperingDetected: Bool? = nilOrValue(pigeonVar_list[4])
+    let tamperingDetails: String? = nilOrValue(pigeonVar_list[5])
+
+    return AdvancedSecuritySignals(
+      rootedOrJailbroken: rootedOrJailbroken,
+      proxyEnabled: proxyEnabled,
+      vpnEnabled: vpnEnabled,
+      debuggerAttached: debuggerAttached,
+      tamperingDetected: tamperingDetected,
+      tamperingDetails: tamperingDetails
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      rootedOrJailbroken,
+      proxyEnabled,
+      vpnEnabled,
+      debuggerAttached,
+      tamperingDetected,
+      tamperingDetails,
+    ]
+  }
+}
+
 private class DefenderMessagesPigeonCodecReader: FlutterStandardReader {
   override func readValue(ofType type: UInt8) -> Any? {
     switch type {
@@ -147,6 +187,8 @@ private class DefenderMessagesPigeonCodecReader: FlutterStandardReader {
       return NativeRuntimeState.fromList(self.readValue() as! [Any?])
     case 131:
       return LifecycleSnapshot.fromList(self.readValue() as! [Any?])
+    case 132:
+      return AdvancedSecuritySignals.fromList(self.readValue() as! [Any?])
     default:
       return super.readValue(ofType: type)
     }
@@ -163,6 +205,9 @@ private class DefenderMessagesPigeonCodecWriter: FlutterStandardWriter {
       super.writeValue(value.toList())
     } else if let value = value as? LifecycleSnapshot {
       super.writeByte(131)
+      super.writeValue(value.toList())
+    } else if let value = value as? AdvancedSecuritySignals {
+      super.writeByte(132)
       super.writeValue(value.toList())
     } else {
       super.writeValue(value)
@@ -188,6 +233,11 @@ class DefenderMessagesPigeonCodec: FlutterStandardMessageCodec, @unchecked Senda
 protocol DefenderHostApi {
   func setProtectionState(secureActive: Bool, overlayHardeningActive: Bool) throws
   func getRuntimeState() throws -> NativeRuntimeState
+  func getAdvancedSecuritySignals() throws -> AdvancedSecuritySignals
+  func secureWrite(key: String, value: String) throws
+  func secureRead(key: String) throws -> String?
+  func secureDelete(key: String) throws
+  func secureClearAll() throws
   func saveLifecycleSnapshot(snapshot: LifecycleSnapshot) throws
   func loadLifecycleSnapshot() throws -> LifecycleSnapshot
   func clearLifecycleSnapshot() throws
@@ -227,6 +277,78 @@ class DefenderHostApiSetup {
       }
     } else {
       getRuntimeStateChannel.setMessageHandler(nil)
+    }
+    let getAdvancedSecuritySignalsChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.flutter_defender.DefenderHostApi.getAdvancedSecuritySignals\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      getAdvancedSecuritySignalsChannel.setMessageHandler { _, reply in
+        do {
+          let result = try api.getAdvancedSecuritySignals()
+          reply(wrapResult(result))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      getAdvancedSecuritySignalsChannel.setMessageHandler(nil)
+    }
+    let secureWriteChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.flutter_defender.DefenderHostApi.secureWrite\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      secureWriteChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let keyArg = args[0] as! String
+        let valueArg = args[1] as! String
+        do {
+          try api.secureWrite(key: keyArg, value: valueArg)
+          reply(wrapResult(nil))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      secureWriteChannel.setMessageHandler(nil)
+    }
+    let secureReadChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.flutter_defender.DefenderHostApi.secureRead\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      secureReadChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let keyArg = args[0] as! String
+        do {
+          let result = try api.secureRead(key: keyArg)
+          reply(wrapResult(result))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      secureReadChannel.setMessageHandler(nil)
+    }
+    let secureDeleteChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.flutter_defender.DefenderHostApi.secureDelete\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      secureDeleteChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let keyArg = args[0] as! String
+        do {
+          try api.secureDelete(key: keyArg)
+          reply(wrapResult(nil))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      secureDeleteChannel.setMessageHandler(nil)
+    }
+    let secureClearAllChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.flutter_defender.DefenderHostApi.secureClearAll\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      secureClearAllChannel.setMessageHandler { _, reply in
+        do {
+          try api.secureClearAll()
+          reply(wrapResult(nil))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      secureClearAllChannel.setMessageHandler(nil)
     }
     let saveLifecycleSnapshotChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.flutter_defender.DefenderHostApi.saveLifecycleSnapshot\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {

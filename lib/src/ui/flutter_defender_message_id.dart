@@ -4,4 +4,7 @@ enum FlutterDefenderMessageId {
   overlaysBlocked,
   screenCaptureBlocked,
   foregroundRequired,
+  rootOrJailbreakBlocked,
+  proxyOrVpnBlocked,
+  tamperingBlocked,
 }

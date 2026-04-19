@@ -27,6 +27,16 @@ class FakeFlutterDefenderPlatform
     wasAuthenticated: false,
     activeGuardKind: pigeon.DefenderGuardKind.none,
   );
+  pigeon.AdvancedSecuritySignals advancedSecuritySignals =
+      pigeon.AdvancedSecuritySignals(
+        rootedOrJailbroken: false,
+        proxyEnabled: false,
+        vpnEnabled: false,
+        debuggerAttached: false,
+        tamperingDetected: false,
+        tamperingDetails: null,
+      );
+  final Map<String, String> secureStorage = <String, String>{};
 
   @override
   Future<void> clearLifecycleSnapshot() async {
@@ -39,6 +49,10 @@ class FakeFlutterDefenderPlatform
 
   @override
   Future<pigeon.NativeRuntimeState> getRuntimeState() async => runtimeState;
+
+  @override
+  Future<pigeon.AdvancedSecuritySignals> getAdvancedSecuritySignals() async =>
+      advancedSecuritySignals;
 
   @override
   Future<pigeon.LifecycleSnapshot> loadLifecycleSnapshot() async =>
@@ -61,6 +75,24 @@ class FakeFlutterDefenderPlatform
     required bool overlayHardeningActive,
   }) async {
     protectionCalls.add((secureActive, overlayHardeningActive));
+  }
+
+  @override
+  Future<void> secureWrite({required String key, required String value}) async {
+    secureStorage[key] = value;
+  }
+
+  @override
+  Future<String?> secureRead(String key) async => secureStorage[key];
+
+  @override
+  Future<void> secureDelete(String key) async {
+    secureStorage.remove(key);
+  }
+
+  @override
+  Future<void> secureClearAll() async {
+    secureStorage.clear();
   }
 
   void emitScreenshot() {

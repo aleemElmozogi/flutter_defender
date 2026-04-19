@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_defender/flutter_defender.dart';
 
 import '../../../app/session/defender_demo_profiles.dart';
 import '../../../app/session/session_controller.dart';
@@ -141,6 +142,14 @@ class HomeScreen extends StatelessWidget {
           onPressed: () =>
               _open(context, '/custom-blocking', 'Opened custom blocking demo'),
         ),
+        const SizedBox(height: 12),
+        FeatureTile(
+          title: 'Secure Storage Helper',
+          subtitle:
+              'Apply the Secure Storage On profile, then run write/read/delete against the built-in helper.',
+          buttonLabel: 'Run secure storage demo',
+          onPressed: _exerciseSecureStorage,
+        ),
       ],
     );
   }
@@ -174,6 +183,30 @@ class HomeScreen extends StatelessWidget {
   void _open(BuildContext context, String route, String event) {
     sessionController.recordVisit(event);
     Navigator.of(context).pushNamed(route);
+  }
+
+  Future<void> _exerciseSecureStorage() async {
+    try {
+      const String key = 'demo.token';
+      const String value = 'token-123';
+      await FlutterDefender.instance.secureWrite(key: key, value: value);
+      final String? resolved = await FlutterDefender.instance.secureRead(key);
+      sessionController.recordVisit(
+        'Secure write/read result: ${resolved ?? "null"}',
+      );
+      await FlutterDefender.instance.secureDelete(key);
+      final String? afterDelete = await FlutterDefender.instance.secureRead(
+        key,
+      );
+      sessionController.recordVisit(
+        'Secure read after delete: ${afterDelete ?? "null"}',
+      );
+    } catch (error) {
+      sessionController.recordVisit(
+        'Secure storage demo failed: enable the Secure Storage On profile.',
+      );
+      debugPrint('Secure storage demo error: $error');
+    }
   }
 }
 

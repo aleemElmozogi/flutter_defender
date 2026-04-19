@@ -37,33 +37,25 @@ abstract class FlutterDefenderPlatform extends PlatformInterface {
   Future<void> setProtectionState({
     required bool secureActive,
     required bool overlayHardeningActive,
-  }) {
-    throw UnimplementedError('setProtectionState() has not been implemented.');
-  }
+  });
 
-  Future<NativeRuntimeState> getRuntimeState() {
-    throw UnimplementedError('getRuntimeState() has not been implemented.');
-  }
+  Future<NativeRuntimeState> getRuntimeState();
 
-  Future<void> saveLifecycleSnapshot(LifecycleSnapshot snapshot) {
-    throw UnimplementedError(
-      'saveLifecycleSnapshot() has not been implemented.',
-    );
-  }
+  Future<AdvancedSecuritySignals> getAdvancedSecuritySignals();
 
-  Future<LifecycleSnapshot> loadLifecycleSnapshot() {
-    throw UnimplementedError(
-      'loadLifecycleSnapshot() has not been implemented.',
-    );
-  }
+  Future<void> secureWrite({required String key, required String value});
 
-  Future<void> clearLifecycleSnapshot() {
-    throw UnimplementedError(
-      'clearLifecycleSnapshot() has not been implemented.',
-    );
-  }
+  Future<String?> secureRead(String key);
 
-  void setCallbacks(FlutterDefenderPlatformCallbacks? callbacks) {
-    throw UnimplementedError('setCallbacks() has not been implemented.');
-  }
+  Future<void> secureDelete(String key);
+
+  Future<void> secureClearAll();
+
+  Future<void> saveLifecycleSnapshot(LifecycleSnapshot snapshot);
+
+  Future<LifecycleSnapshot> loadLifecycleSnapshot();
+
+  Future<void> clearLifecycleSnapshot();
+
+  void setCallbacks(FlutterDefenderPlatformCallbacks? callbacks);
 }

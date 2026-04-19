@@ -82,8 +82,16 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
     int? pinBackgroundTimeoutSeconds,
     bool enableForegroundCheck = true,
     bool enableEmulatorDetectionRelease = true,
+    bool? enableRootDetection,
+    bool? enableProxyVpnDetection,
+    bool? enableRaspDetection,
+    bool enableSecureStorageHelper = false,
+    bool clearSecureStorageOnLogout = false,
     Widget Function(String message)? blockingScreenBuilder,
     VoidCallback? onLogoutRequested,
+    VoidCallback? onRootDetected,
+    VoidCallback? onProxyOrVpnDetected,
+    VoidCallback? onTamperingDetected,
     FlutterDefenderUiTheme uiTheme = FlutterDefenderUiTheme.defaults,
     Locale? blockingLocale,
     String Function(BuildContext context, FlutterDefenderMessageId id)?
@@ -92,14 +100,24 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
   }) {
     final int resolvedAuthenticatedBackgroundTimeoutSeconds =
         pinBackgroundTimeoutSeconds ?? authenticatedBackgroundTimeoutSeconds;
+    final bool releaseEnabledByDefault = kReleaseMode;
     final Future<void> future = _performInit(
       otpBackgroundTimeoutSeconds: otpBackgroundTimeoutSeconds,
       authenticatedBackgroundTimeoutSeconds:
           resolvedAuthenticatedBackgroundTimeoutSeconds,
       enableForegroundCheck: enableForegroundCheck,
       enableEmulatorDetectionRelease: enableEmulatorDetectionRelease,
+      enableRootDetection: enableRootDetection ?? releaseEnabledByDefault,
+      enableProxyVpnDetection:
+          enableProxyVpnDetection ?? releaseEnabledByDefault,
+      enableRaspDetection: enableRaspDetection ?? releaseEnabledByDefault,
+      enableSecureStorageHelper: enableSecureStorageHelper,
+      clearSecureStorageOnLogout: clearSecureStorageOnLogout,
       blockingScreenBuilder: blockingScreenBuilder,
       onLogoutRequested: onLogoutRequested,
+      onRootDetected: onRootDetected,
+      onProxyOrVpnDetected: onProxyOrVpnDetected,
+      onTamperingDetected: onTamperingDetected,
       uiTheme: uiTheme,
       blockingLocale: blockingLocale,
       messageResolver: messageResolver,
@@ -115,10 +133,54 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
       ..logoutTriggeredForCurrentBackground = false;
     if (!authenticated) {
       _runtime.pausedAtMs = null;
+      if (_config.enableSecureStorageHelper &&
+          _config.clearSecureStorageOnLogout) {
+        unawaited(_safeSecureClearAll());
+      }
     }
     unawaited(
       _persistLifecycleSnapshot(lastBackgroundedAtMs: _runtime.pausedAtMs),
     );
+  }
+
+  Future<void> secureWrite({required String key, required String value}) async {
+    if (!_config.enableSecureStorageHelper) {
+      throw StateError(
+        'Secure storage helper is disabled. Enable it with '
+        'enableSecureStorageHelper: true in FlutterDefender.init().',
+      );
+    }
+    await _safeSecureWrite(key: key, value: value);
+  }
+
+  Future<String?> secureRead(String key) async {
+    if (!_config.enableSecureStorageHelper) {
+      throw StateError(
+        'Secure storage helper is disabled. Enable it with '
+        'enableSecureStorageHelper: true in FlutterDefender.init().',
+      );
+    }
+    return _safeSecureRead(key);
+  }
+
+  Future<void> secureDelete(String key) async {
+    if (!_config.enableSecureStorageHelper) {
+      throw StateError(
+        'Secure storage helper is disabled. Enable it with '
+        'enableSecureStorageHelper: true in FlutterDefender.init().',
+      );
+    }
+    await _safeSecureDelete(key);
+  }
+
+  Future<void> secureClearAll() async {
+    if (!_config.enableSecureStorageHelper) {
+      throw StateError(
+        'Secure storage helper is disabled. Enable it with '
+        'enableSecureStorageHelper: true in FlutterDefender.init().',
+      );
+    }
+    await _safeSecureClearAll();
   }
 
   @override

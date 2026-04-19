@@ -28,6 +28,56 @@ extension _FlutterDefenderPlatformSafety on FlutterDefender {
     }
   }
 
+  Future<pigeon.AdvancedSecuritySignals>
+  _safeGetAdvancedSecuritySignals() async {
+    try {
+      return await _platform.getAdvancedSecuritySignals();
+    } catch (_) {
+      return pigeon.AdvancedSecuritySignals(
+        rootedOrJailbroken: false,
+        proxyEnabled: false,
+        vpnEnabled: false,
+        debuggerAttached: false,
+        tamperingDetected: false,
+      );
+    }
+  }
+
+  Future<void> _safeSecureWrite({
+    required String key,
+    required String value,
+  }) async {
+    try {
+      await _platform.secureWrite(key: key, value: value);
+    } catch (_) {
+      // Ignore secure storage failures; app decides fallback behavior.
+    }
+  }
+
+  Future<String?> _safeSecureRead(String key) async {
+    try {
+      return await _platform.secureRead(key);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _safeSecureDelete(String key) async {
+    try {
+      await _platform.secureDelete(key);
+    } catch (_) {
+      // Ignore secure storage failures.
+    }
+  }
+
+  Future<void> _safeSecureClearAll() async {
+    try {
+      await _platform.secureClearAll();
+    } catch (_) {
+      // Ignore secure storage failures.
+    }
+  }
+
   Future<void> _safeSaveLifecycleSnapshot(
     pigeon.LifecycleSnapshot snapshot,
   ) async {

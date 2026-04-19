@@ -13,6 +13,27 @@ extension _FlutterDefenderPolicyBlocking on FlutterDefender {
       );
       return;
     }
+    if (_runtime.rootBlocked) {
+      _showBlocking(
+        FlutterDefenderMessageId.rootOrJailbreakBlocked,
+        DefenderBlockingSource.root,
+      );
+      return;
+    }
+    if (_runtime.proxyOrVpnBlocked) {
+      _showBlocking(
+        FlutterDefenderMessageId.proxyOrVpnBlocked,
+        DefenderBlockingSource.proxyVpn,
+      );
+      return;
+    }
+    if (_runtime.tamperingBlocked) {
+      _showBlocking(
+        FlutterDefenderMessageId.tamperingBlocked,
+        DefenderBlockingSource.tampering,
+      );
+      return;
+    }
     if (_runtime.screenCaptureActive) {
       _showBlocking(
         FlutterDefenderMessageId.screenCaptureBlocked,

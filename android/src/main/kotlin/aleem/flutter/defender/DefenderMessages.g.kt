@@ -111,6 +111,39 @@ data class LifecycleSnapshot (
     )
   }
 }
+
+/** Generated class from Pigeon that represents data sent in messages. */
+data class AdvancedSecuritySignals (
+  val rootedOrJailbroken: Boolean? = null,
+  val proxyEnabled: Boolean? = null,
+  val vpnEnabled: Boolean? = null,
+  val debuggerAttached: Boolean? = null,
+  val tamperingDetected: Boolean? = null,
+  val tamperingDetails: String? = null
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): AdvancedSecuritySignals {
+      val rootedOrJailbroken = pigeonVar_list[0] as Boolean?
+      val proxyEnabled = pigeonVar_list[1] as Boolean?
+      val vpnEnabled = pigeonVar_list[2] as Boolean?
+      val debuggerAttached = pigeonVar_list[3] as Boolean?
+      val tamperingDetected = pigeonVar_list[4] as Boolean?
+      val tamperingDetails = pigeonVar_list[5] as String?
+      return AdvancedSecuritySignals(rootedOrJailbroken, proxyEnabled, vpnEnabled, debuggerAttached, tamperingDetected, tamperingDetails)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      rootedOrJailbroken,
+      proxyEnabled,
+      vpnEnabled,
+      debuggerAttached,
+      tamperingDetected,
+      tamperingDetails,
+    )
+  }
+}
 private open class DefenderMessagesPigeonCodec : StandardMessageCodec() {
   override fun readValueOfType(type: Byte, buffer: ByteBuffer): Any? {
     return when (type) {
@@ -127,6 +160,11 @@ private open class DefenderMessagesPigeonCodec : StandardMessageCodec() {
       131.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
           LifecycleSnapshot.fromList(it)
+        }
+      }
+      132.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          AdvancedSecuritySignals.fromList(it)
         }
       }
       else -> super.readValueOfType(type, buffer)
@@ -146,6 +184,10 @@ private open class DefenderMessagesPigeonCodec : StandardMessageCodec() {
         stream.write(131)
         writeValue(stream, value.toList())
       }
+      is AdvancedSecuritySignals -> {
+        stream.write(132)
+        writeValue(stream, value.toList())
+      }
       else -> super.writeValue(stream, value)
     }
   }
@@ -155,6 +197,11 @@ private open class DefenderMessagesPigeonCodec : StandardMessageCodec() {
 interface DefenderHostApi {
   fun setProtectionState(secureActive: Boolean, overlayHardeningActive: Boolean)
   fun getRuntimeState(): NativeRuntimeState
+  fun getAdvancedSecuritySignals(): AdvancedSecuritySignals
+  fun secureWrite(key: String, value: String)
+  fun secureRead(key: String): String?
+  fun secureDelete(key: String)
+  fun secureClearAll()
   fun saveLifecycleSnapshot(snapshot: LifecycleSnapshot)
   fun loadLifecycleSnapshot(): LifecycleSnapshot
   fun clearLifecycleSnapshot()
@@ -193,6 +240,91 @@ interface DefenderHostApi {
           channel.setMessageHandler { _, reply ->
             val wrapped: List<Any?> = try {
               listOf(api.getRuntimeState())
+            } catch (exception: Throwable) {
+              wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.flutter_defender.DefenderHostApi.getAdvancedSecuritySignals$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            val wrapped: List<Any?> = try {
+              listOf(api.getAdvancedSecuritySignals())
+            } catch (exception: Throwable) {
+              wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.flutter_defender.DefenderHostApi.secureWrite$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val keyArg = args[0] as String
+            val valueArg = args[1] as String
+            val wrapped: List<Any?> = try {
+              api.secureWrite(keyArg, valueArg)
+              listOf(null)
+            } catch (exception: Throwable) {
+              wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.flutter_defender.DefenderHostApi.secureRead$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val keyArg = args[0] as String
+            val wrapped: List<Any?> = try {
+              listOf(api.secureRead(keyArg))
+            } catch (exception: Throwable) {
+              wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.flutter_defender.DefenderHostApi.secureDelete$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val keyArg = args[0] as String
+            val wrapped: List<Any?> = try {
+              api.secureDelete(keyArg)
+              listOf(null)
+            } catch (exception: Throwable) {
+              wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.flutter_defender.DefenderHostApi.secureClearAll$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            val wrapped: List<Any?> = try {
+              api.secureClearAll()
+              listOf(null)
             } catch (exception: Throwable) {
               wrapError(exception)
             }
