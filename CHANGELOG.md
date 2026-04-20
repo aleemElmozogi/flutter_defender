@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Update `environment.sdk` constraint to include an upper bound (`>=3.10.1 <4.0.0`).
+
+## [0.2.1] - 2026-04-19
+
 ### Added
 
 - Optional root/jailbreak detection layer with `enableRootDetection` and `onRootDetected`.
@@ -26,7 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added iOS privacy concealment while guarded routes are inactive, and documented it separately from true overlay protection.
 - Expanded the example app into a configuration profile lab for UI customization and policy toggles.
 - Added GitHub Actions workflows for PR/main CI, release tag creation on version bumps, and tag-triggered pub.dev publishing.
-- Repositioned package docs from banking-specific wording to general-purpose sensitive-data app protection.
 
 ## [0.2.0] - 2026-04-19
 

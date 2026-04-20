@@ -1,12 +1,12 @@
 name: flutter_defender
 description: "A comprehensive Flutter security plugin that protects against overlay attacks, task hijacking, screenshot capture, background session abuse, an emulator execution."
-version: 0.2.0
+version: 0.2.1
 homepage: https://github.com/aleemElmozogi/flutter_defender
 repository: https://github.com/aleemElmozogi/flutter_defender
 license: Apache-2.0
 
 environment:
-  sdk: ^3.10.1
+  sdk: ">=3.10.1 <4.0.0"
   flutter: '>=3.35.0'
 
 dependencies:
