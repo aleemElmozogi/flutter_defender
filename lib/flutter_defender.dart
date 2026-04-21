@@ -41,6 +41,49 @@ class _DefenderNotifier extends ChangeNotifier {
   void emit() => notifyListeners();
 }
 
+class _PendingInitRequest {
+  _PendingInitRequest({
+    required this.otpBackgroundTimeoutSeconds,
+    required this.authenticatedBackgroundTimeoutSeconds,
+    required this.enableForegroundCheck,
+    required this.enableEmulatorDetectionRelease,
+    required this.enableRootDetection,
+    required this.enableProxyVpnDetection,
+    required this.enableRaspDetection,
+    required this.enableSecureStorageHelper,
+    required this.clearSecureStorageOnLogout,
+    required this.blockingScreenBuilder,
+    required this.onLogoutRequested,
+    required this.onRootDetected,
+    required this.onProxyOrVpnDetected,
+    required this.onTamperingDetected,
+    required this.uiTheme,
+    required this.blockingLocale,
+    required this.messageResolver,
+    required this.blockingTitleResolver,
+  });
+
+  final int otpBackgroundTimeoutSeconds;
+  final int authenticatedBackgroundTimeoutSeconds;
+  final bool enableForegroundCheck;
+  final bool enableEmulatorDetectionRelease;
+  final bool enableRootDetection;
+  final bool enableProxyVpnDetection;
+  final bool enableRaspDetection;
+  final bool enableSecureStorageHelper;
+  final bool clearSecureStorageOnLogout;
+  final Widget Function(String message)? blockingScreenBuilder;
+  final VoidCallback? onLogoutRequested;
+  final VoidCallback? onRootDetected;
+  final VoidCallback? onProxyOrVpnDetected;
+  final VoidCallback? onTamperingDetected;
+  final FlutterDefenderUiTheme uiTheme;
+  final Locale? blockingLocale;
+  final String Function(BuildContext context, FlutterDefenderMessageId id)?
+  messageResolver;
+  final String Function(BuildContext context)? blockingTitleResolver;
+}
+
 class FlutterDefender with WidgetsBindingObserver implements Listenable {
   FlutterDefender._internal();
 
@@ -55,6 +98,9 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
 
   FlutterDefenderConfig _config = const FlutterDefenderConfig();
   Future<void>? _initFuture;
+  Future<void>? _initDrainFuture;
+  _PendingInitRequest? _pendingInitRequest;
+  bool _observerRegistered = false;
   int _syncGeneration = 0;
   DateTime Function() _nowProvider = DateTime.now;
 
@@ -101,7 +147,7 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
     final int resolvedAuthenticatedBackgroundTimeoutSeconds =
         pinBackgroundTimeoutSeconds ?? authenticatedBackgroundTimeoutSeconds;
     final bool releaseEnabledByDefault = kReleaseMode;
-    final Future<void> future = _performInit(
+    _pendingInitRequest = _PendingInitRequest(
       otpBackgroundTimeoutSeconds: otpBackgroundTimeoutSeconds,
       authenticatedBackgroundTimeoutSeconds:
           resolvedAuthenticatedBackgroundTimeoutSeconds,
@@ -123,8 +169,50 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
       messageResolver: messageResolver,
       blockingTitleResolver: blockingTitleResolver,
     );
+
+    final Future<void> future = _scheduleInitDrain();
     _initFuture = future;
     return future;
+  }
+
+  Future<void> _scheduleInitDrain() {
+    return _initDrainFuture ??= _drainInitQueue();
+  }
+
+  Future<void> _drainInitQueue() async {
+    try {
+      while (_pendingInitRequest != null) {
+        final _PendingInitRequest request = _pendingInitRequest!;
+        _pendingInitRequest = null;
+        await _performInit(
+          otpBackgroundTimeoutSeconds: request.otpBackgroundTimeoutSeconds,
+          authenticatedBackgroundTimeoutSeconds:
+              request.authenticatedBackgroundTimeoutSeconds,
+          enableForegroundCheck: request.enableForegroundCheck,
+          enableEmulatorDetectionRelease:
+              request.enableEmulatorDetectionRelease,
+          enableRootDetection: request.enableRootDetection,
+          enableProxyVpnDetection: request.enableProxyVpnDetection,
+          enableRaspDetection: request.enableRaspDetection,
+          enableSecureStorageHelper: request.enableSecureStorageHelper,
+          clearSecureStorageOnLogout: request.clearSecureStorageOnLogout,
+          blockingScreenBuilder: request.blockingScreenBuilder,
+          onLogoutRequested: request.onLogoutRequested,
+          onRootDetected: request.onRootDetected,
+          onProxyOrVpnDetected: request.onProxyOrVpnDetected,
+          onTamperingDetected: request.onTamperingDetected,
+          uiTheme: request.uiTheme,
+          blockingLocale: request.blockingLocale,
+          messageResolver: request.messageResolver,
+          blockingTitleResolver: request.blockingTitleResolver,
+        );
+      }
+    } finally {
+      _initDrainFuture = null;
+      if (_pendingInitRequest != null) {
+        _initFuture = _scheduleInitDrain();
+      }
+    }
   }
 
   void setAuthenticated(bool authenticated) {
@@ -135,7 +223,12 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
       _runtime.pausedAtMs = null;
       if (_config.enableSecureStorageHelper &&
           _config.clearSecureStorageOnLogout) {
-        unawaited(_safeSecureClearAll());
+        unawaited(
+          _safeSecureClearAll().catchError((Object _, StackTrace _) {
+            // Keep setter signature synchronous; fail-fast semantics are enforced
+            // in async timeout/logout paths and direct storage API calls.
+          }),
+        );
       }
     }
     unawaited(
@@ -191,8 +284,9 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
       _notifier.removeListener(listener);
 
   void dispose() {
-    if (_runtime.initialized) {
+    if (_observerRegistered) {
       WidgetsBinding.instance.removeObserver(this);
+      _observerRegistered = false;
     }
     _platform.setCallbacks(null);
     _activeGuards.clear();
@@ -205,6 +299,8 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
     unawaited(_safeClearLifecycleSnapshot());
     _runtime.reset();
     _initFuture = null;
+    _initDrainFuture = null;
+    _pendingInitRequest = null;
     _nowProvider = DateTime.now;
     _notifyListeners();
   }

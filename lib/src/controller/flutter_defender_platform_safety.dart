@@ -47,35 +47,19 @@ extension _FlutterDefenderPlatformSafety on FlutterDefender {
     required String key,
     required String value,
   }) async {
-    try {
-      await _platform.secureWrite(key: key, value: value);
-    } catch (_) {
-      // Ignore secure storage failures; app decides fallback behavior.
-    }
+    await _platform.secureWrite(key: key, value: value);
   }
 
   Future<String?> _safeSecureRead(String key) async {
-    try {
-      return await _platform.secureRead(key);
-    } catch (_) {
-      return null;
-    }
+    return _platform.secureRead(key);
   }
 
   Future<void> _safeSecureDelete(String key) async {
-    try {
-      await _platform.secureDelete(key);
-    } catch (_) {
-      // Ignore secure storage failures.
-    }
+    await _platform.secureDelete(key);
   }
 
   Future<void> _safeSecureClearAll() async {
-    try {
-      await _platform.secureClearAll();
-    } catch (_) {
-      // Ignore secure storage failures.
-    }
+    await _platform.secureClearAll();
   }
 
   Future<void> _safeSaveLifecycleSnapshot(

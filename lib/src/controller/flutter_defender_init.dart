@@ -23,52 +23,56 @@ extension _FlutterDefenderInit on FlutterDefender {
     required String Function(BuildContext context)? blockingTitleResolver,
   }) async {
     _runtime.initInFlight = true;
-    _config = FlutterDefenderConfig.fromInit(
-      otpBackgroundTimeoutSeconds: otpBackgroundTimeoutSeconds,
-      authenticatedBackgroundTimeoutSeconds:
-          authenticatedBackgroundTimeoutSeconds,
-      enableForegroundCheck: enableForegroundCheck,
-      enableEmulatorDetectionRelease: enableEmulatorDetectionRelease,
-      enableRootDetection: enableRootDetection,
-      enableProxyVpnDetection: enableProxyVpnDetection,
-      enableRaspDetection: enableRaspDetection,
-      enableSecureStorageHelper: enableSecureStorageHelper,
-      clearSecureStorageOnLogout: clearSecureStorageOnLogout,
-      blockingScreenBuilder: blockingScreenBuilder,
-      onLogoutRequested: onLogoutRequested,
-      onRootDetected: onRootDetected,
-      onProxyOrVpnDetected: onProxyOrVpnDetected,
-      onTamperingDetected: onTamperingDetected,
-      uiTheme: uiTheme,
-      blockingLocale: blockingLocale,
-      messageResolver: messageResolver,
-      blockingTitleResolver: blockingTitleResolver,
-    );
+    try {
+      _config = FlutterDefenderConfig.fromInit(
+        otpBackgroundTimeoutSeconds: otpBackgroundTimeoutSeconds,
+        authenticatedBackgroundTimeoutSeconds:
+            authenticatedBackgroundTimeoutSeconds,
+        enableForegroundCheck: enableForegroundCheck,
+        enableEmulatorDetectionRelease: enableEmulatorDetectionRelease,
+        enableRootDetection: enableRootDetection,
+        enableProxyVpnDetection: enableProxyVpnDetection,
+        enableRaspDetection: enableRaspDetection,
+        enableSecureStorageHelper: enableSecureStorageHelper,
+        clearSecureStorageOnLogout: clearSecureStorageOnLogout,
+        blockingScreenBuilder: blockingScreenBuilder,
+        onLogoutRequested: onLogoutRequested,
+        onRootDetected: onRootDetected,
+        onProxyOrVpnDetected: onProxyOrVpnDetected,
+        onTamperingDetected: onTamperingDetected,
+        uiTheme: uiTheme,
+        blockingLocale: blockingLocale,
+        messageResolver: messageResolver,
+        blockingTitleResolver: blockingTitleResolver,
+      );
 
-    _platform.setCallbacks(
-      FlutterDefenderPlatformCallbacks(
-        onScreenshotDetected: _handleScreenshotDetected,
-        onScreenCaptureChanged: _handleScreenCaptureChanged,
-        onOverlayViolation: _handleOverlayViolation,
-        onForegroundStateChanged: _handleForegroundStateChanged,
-      ),
-    );
+      _platform.setCallbacks(
+        FlutterDefenderPlatformCallbacks(
+          onScreenshotDetected: _handleScreenshotDetected,
+          onScreenCaptureChanged: _handleScreenCaptureChanged,
+          onOverlayViolation: _handleOverlayViolation,
+          onForegroundStateChanged: _handleForegroundStateChanged,
+        ),
+      );
 
-    if (!_runtime.initialized) {
-      WidgetsBinding.instance.addObserver(this);
+      if (!_observerRegistered) {
+        WidgetsBinding.instance.addObserver(this);
+        _observerRegistered = true;
+      }
+
+      final pigeon.LifecycleSnapshot snapshot =
+          await _safeLoadLifecycleSnapshot();
+      final pigeon.NativeRuntimeState runtimeState =
+          await _safeGetRuntimeState();
+
+      _applyRuntimeState(runtimeState);
+      await _applyColdStartSnapshot(snapshot);
+      _runtime.initialized = true;
+
+      await _safeClearLifecycleSnapshot();
+      await _syncProtection();
+    } finally {
+      _runtime.initInFlight = false;
     }
-
-    final pigeon.LifecycleSnapshot snapshot =
-        await _safeLoadLifecycleSnapshot();
-    final pigeon.NativeRuntimeState runtimeState = await _safeGetRuntimeState();
-
-    _applyRuntimeState(runtimeState);
-    _applyColdStartSnapshot(snapshot);
-    _runtime
-      ..initialized = true
-      ..initInFlight = false;
-
-    await _safeClearLifecycleSnapshot();
-    await _syncProtection();
   }
 }

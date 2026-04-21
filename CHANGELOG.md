@@ -7,8 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-04-20
+
+### Added
+
+- Test coverage for hardening behavior:
+  - secure storage fail-fast error propagation
+  - cold-start authenticated-timeout secure-clear parity
+  - concurrent `init()` latest-wins behavior
+
 ### Changed
+
 - Update `environment.sdk` constraint to include an upper bound (`>=3.10.1 <4.0.0`).
+- `FlutterDefender.init()` is now serialized and deterministic under repeated calls (latest-wins).
+- Init lifecycle handling is exception-safe (`initInFlight` reset via `finally`) and observer registration is idempotent.
+- Advanced security detections (root/proxy-vpn/rasp) now run asynchronously on native background execution paths and return cached snapshots quickly to Dart.
+- Secure storage operations now follow fail-fast semantics for platform failures (write/read/delete/clear).
+- Authenticated-timeout logout handling now applies secure-storage clearing consistently across resume-time and cold-start paths.
+- Android plugin lifecycle cleanup removed unused mutable context state and tightened detector/cache lifecycle.
+
+### Fixed
+
+- Eliminated silent secure-storage failure paths where operations previously appeared successful despite native errors.
+- Removed timeout-behavior drift between cold-start and resume-time authenticated logout flows.
 
 ## [0.2.1] - 2026-04-19
 
