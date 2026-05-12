@@ -23,7 +23,7 @@ There is no route-observer setup. A guarded screen protects itself before the se
 
 ```yaml
 dependencies:
-  flutter_defender: ^0.2.0
+  flutter_defender: ^0.2.4
 ```
 
 ## Quick Start
