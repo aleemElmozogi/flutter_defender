@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-05-12
+
+### Fixed
+
+- Fixed `authenticatedBackgroundTimeoutSeconds` and `otpBackgroundTimeoutSeconds` so timeout handling fires at the configured boundary instead of requiring an extra second.
+- Fixed Android resume handling so `hidden -> inactive -> resumed` does not overwrite the original background timestamp and prevent authenticated logout or OTP dismissal.
+- Fixed native foreground callback timeout handling so Android foreground/focus transitions apply the same background-timeout policy.
+- Fixed Android VPN detection to avoid crashing host apps when network-state access is unavailable.
+
+### Tests
+
+- Added regression coverage for authenticated timeout, OTP timeout, Android resume lifecycle ordering, native foreground callbacks, and cold-start timeout behavior.
+
 ## [0.2.2] - 2026-04-20
 
 ### Added
