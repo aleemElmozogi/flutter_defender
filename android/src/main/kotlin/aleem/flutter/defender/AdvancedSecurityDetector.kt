@@ -76,11 +76,15 @@ internal class AdvancedSecurityDetector(private val context: Context) {
     }
 
     private fun isVpnEnabled(): Boolean {
-        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-        val activeNetwork = cm?.activeNetwork
-        val capabilities = activeNetwork?.let { cm.getNetworkCapabilities(it) }
-        if (capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true) {
-            return true
+        try {
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            val activeNetwork = cm?.activeNetwork
+            val capabilities = activeNetwork?.let { cm.getNetworkCapabilities(it) }
+            if (capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true) {
+                return true
+            }
+        } catch (_: Throwable) {
+            // Fall back to network-interface inspection when network state is unavailable.
         }
         return try {
             NetworkInterface.getNetworkInterfaces().toList().any { intf ->

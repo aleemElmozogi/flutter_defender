@@ -18,14 +18,14 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
       final int elapsedSeconds =
           (_nowProvider().millisecondsSinceEpoch - pausedAtMs) ~/ 1000;
       if (_currentGuardKind == pigeon.DefenderGuardKind.otp &&
-          elapsedSeconds > _config.otpBackgroundTimeoutSeconds) {
+          elapsedSeconds >= _config.otpBackgroundTimeoutSeconds) {
         _popLatestOtpGuard();
         await _syncProtection();
         return;
       }
       if (_runtime.isAuthenticated &&
           !_runtime.logoutTriggeredForCurrentBackground &&
-          elapsedSeconds > _config.authenticatedBackgroundTimeoutSeconds) {
+          elapsedSeconds >= _config.authenticatedBackgroundTimeoutSeconds) {
         _runtime.logoutTriggeredForCurrentBackground = true;
         await _requestLogout();
       }
@@ -49,11 +49,11 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
         snapshot.activeGuardKind ?? pigeon.DefenderGuardKind.none;
 
     if (wasAuthenticated &&
-        elapsedSeconds > _config.authenticatedBackgroundTimeoutSeconds) {
+        elapsedSeconds >= _config.authenticatedBackgroundTimeoutSeconds) {
       await _requestLogout();
     }
     if (activeGuardKind == pigeon.DefenderGuardKind.otp &&
-        elapsedSeconds > _config.otpBackgroundTimeoutSeconds) {
+        elapsedSeconds >= _config.otpBackgroundTimeoutSeconds) {
       _runtime.pendingColdStartOtpPop = true;
     }
   }
@@ -195,9 +195,19 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
   }
 
   void _handleForegroundStateChanged(bool active) {
+    final bool wasForeground = _runtime.isForeground;
     _runtime.isForeground = active;
     if (active) {
       _runtime.overlayViolationActive = false;
+      unawaited(_handleAppResumed());
+      return;
+    }
+    if (wasForeground) {
+      final int nowMs = _nowProvider().millisecondsSinceEpoch;
+      _runtime
+        ..pausedAtMs = nowMs
+        ..logoutTriggeredForCurrentBackground = false;
+      unawaited(_persistLifecycleSnapshot(lastBackgroundedAtMs: nowMs));
     }
     _recomputeBlockingState();
     _notifyListeners();
