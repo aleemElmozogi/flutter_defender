@@ -313,6 +313,125 @@ void main() {
     },
   );
 
+  testWidgets('authenticated timeout fires at configured boundary', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    final DateTime base = DateTime(2026, 4, 12, 12);
+    defender.debugSetNowProvider(() => base);
+    var logoutCalls = 0;
+    await defender.init(
+      authenticatedBackgroundTimeoutSeconds: 20,
+      onLogoutRequested: () {
+        logoutCalls += 1;
+      },
+    );
+
+    defender.setAuthenticated(true);
+    defender.didChangeAppLifecycleState(AppLifecycleState.paused);
+    defender.debugSetNowProvider(() => base.add(const Duration(seconds: 20)));
+    defender.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await tester.pump();
+
+    expect(logoutCalls, 1);
+  });
+
+  testWidgets('android resume sequence preserves original background time', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    final DateTime base = DateTime(2026, 4, 12, 12);
+    defender.debugSetNowProvider(() => base);
+    var logoutCalls = 0;
+    await defender.init(
+      authenticatedBackgroundTimeoutSeconds: 20,
+      onLogoutRequested: () {
+        logoutCalls += 1;
+      },
+    );
+
+    defender.setAuthenticated(true);
+    defender.didChangeAppLifecycleState(AppLifecycleState.inactive);
+    defender.didChangeAppLifecycleState(AppLifecycleState.hidden);
+    defender.didChangeAppLifecycleState(AppLifecycleState.paused);
+    defender.debugSetNowProvider(() => base.add(const Duration(seconds: 20)));
+    defender.didChangeAppLifecycleState(AppLifecycleState.hidden);
+    defender.didChangeAppLifecycleState(AppLifecycleState.inactive);
+    defender.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await tester.pump();
+
+    expect(logoutCalls, 1);
+  });
+
+  testWidgets('native foreground callback applies authenticated timeout', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    final DateTime base = DateTime(2026, 4, 12, 12);
+    defender.debugSetNowProvider(() => base);
+    var logoutCalls = 0;
+    await defender.init(
+      authenticatedBackgroundTimeoutSeconds: 20,
+      onLogoutRequested: () {
+        logoutCalls += 1;
+      },
+    );
+
+    defender.setAuthenticated(true);
+    fakePlatform.emitForegroundStateChanged(false);
+    defender.debugSetNowProvider(() => base.add(const Duration(seconds: 20)));
+    fakePlatform.emitForegroundStateChanged(true);
+    await tester.pump();
+
+    expect(logoutCalls, 1);
+  });
+
+  testWidgets('otp timeout pops guard at configured boundary', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    final DateTime base = DateTime(2026, 4, 12, 12);
+    defender.debugSetNowProvider(() => base);
+    await defender.init(otpBackgroundTimeoutSeconds: 10);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (BuildContext context) {
+            return Scaffold(
+              body: ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const FlutterDefenderOtpGuard(
+                        child: Scaffold(body: Text('otp')),
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('open otp'),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.tap(find.text('open otp'));
+    await tester.pumpAndSettle();
+    expect(find.text('otp'), findsOneWidget);
+
+    defender.didChangeAppLifecycleState(AppLifecycleState.paused);
+    defender.debugSetNowProvider(() => base.add(const Duration(seconds: 10)));
+    defender.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
+    expect(find.text('otp'), findsNothing);
+  });
+
   testWidgets('latest init call wins under concurrent calls', (
     WidgetTester tester,
   ) async {
