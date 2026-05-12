@@ -318,7 +318,6 @@ void main() {
   ) async {
     defender.dispose();
     defender = FlutterDefender.instance;
-    fakePlatform.loadLifecycleSnapshotDelay = const Duration(milliseconds: 100);
 
     final Future<void> initA = defender.init(enableForegroundCheck: true);
     final Future<void> initB = defender.init(enableForegroundCheck: false);
@@ -334,10 +333,12 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
 
     fakePlatform.emitForegroundStateChanged(false);
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
 
     expect(
       find.text(

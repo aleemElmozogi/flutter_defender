@@ -61,6 +61,7 @@ class _PendingInitRequest {
     required this.blockingLocale,
     required this.messageResolver,
     required this.blockingTitleResolver,
+    required this.completer,
   });
 
   final int otpBackgroundTimeoutSeconds;
@@ -82,6 +83,7 @@ class _PendingInitRequest {
   final String Function(BuildContext context, FlutterDefenderMessageId id)?
   messageResolver;
   final String Function(BuildContext context)? blockingTitleResolver;
+  final Completer<void> completer;
 }
 
 class FlutterDefender with WidgetsBindingObserver implements Listenable {
@@ -98,7 +100,7 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
 
   FlutterDefenderConfig _config = const FlutterDefenderConfig();
   Future<void>? _initFuture;
-  Future<void>? _initDrainFuture;
+  bool _isDrainingInit = false;
   _PendingInitRequest? _pendingInitRequest;
   bool _observerRegistered = false;
   int _syncGeneration = 0;
@@ -147,6 +149,11 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
     final int resolvedAuthenticatedBackgroundTimeoutSeconds =
         pinBackgroundTimeoutSeconds ?? authenticatedBackgroundTimeoutSeconds;
     final bool releaseEnabledByDefault = kReleaseMode;
+    final Completer<void> completer = Completer<void>();
+    if (_pendingInitRequest != null &&
+        !_pendingInitRequest!.completer.isCompleted) {
+      _pendingInitRequest!.completer.complete();
+    }
     _pendingInitRequest = _PendingInitRequest(
       otpBackgroundTimeoutSeconds: otpBackgroundTimeoutSeconds,
       authenticatedBackgroundTimeoutSeconds:
@@ -168,15 +175,21 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
       blockingLocale: blockingLocale,
       messageResolver: messageResolver,
       blockingTitleResolver: blockingTitleResolver,
+      completer: completer,
     );
 
-    final Future<void> future = _scheduleInitDrain();
+    final Future<void> future = completer.future;
+    unawaited(_scheduleInitDrain());
     _initFuture = future;
     return future;
   }
 
-  Future<void> _scheduleInitDrain() {
-    return _initDrainFuture ??= _drainInitQueue();
+  Future<void> _scheduleInitDrain() async {
+    if (_isDrainingInit) {
+      return;
+    }
+    _isDrainingInit = true;
+    await _drainInitQueue();
   }
 
   Future<void> _drainInitQueue() async {
@@ -184,33 +197,42 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
       while (_pendingInitRequest != null) {
         final _PendingInitRequest request = _pendingInitRequest!;
         _pendingInitRequest = null;
-        await _performInit(
-          otpBackgroundTimeoutSeconds: request.otpBackgroundTimeoutSeconds,
-          authenticatedBackgroundTimeoutSeconds:
-              request.authenticatedBackgroundTimeoutSeconds,
-          enableForegroundCheck: request.enableForegroundCheck,
-          enableEmulatorDetectionRelease:
-              request.enableEmulatorDetectionRelease,
-          enableRootDetection: request.enableRootDetection,
-          enableProxyVpnDetection: request.enableProxyVpnDetection,
-          enableRaspDetection: request.enableRaspDetection,
-          enableSecureStorageHelper: request.enableSecureStorageHelper,
-          clearSecureStorageOnLogout: request.clearSecureStorageOnLogout,
-          blockingScreenBuilder: request.blockingScreenBuilder,
-          onLogoutRequested: request.onLogoutRequested,
-          onRootDetected: request.onRootDetected,
-          onProxyOrVpnDetected: request.onProxyOrVpnDetected,
-          onTamperingDetected: request.onTamperingDetected,
-          uiTheme: request.uiTheme,
-          blockingLocale: request.blockingLocale,
-          messageResolver: request.messageResolver,
-          blockingTitleResolver: request.blockingTitleResolver,
-        );
+        try {
+          await _performInit(
+            otpBackgroundTimeoutSeconds: request.otpBackgroundTimeoutSeconds,
+            authenticatedBackgroundTimeoutSeconds:
+                request.authenticatedBackgroundTimeoutSeconds,
+            enableForegroundCheck: request.enableForegroundCheck,
+            enableEmulatorDetectionRelease:
+                request.enableEmulatorDetectionRelease,
+            enableRootDetection: request.enableRootDetection,
+            enableProxyVpnDetection: request.enableProxyVpnDetection,
+            enableRaspDetection: request.enableRaspDetection,
+            enableSecureStorageHelper: request.enableSecureStorageHelper,
+            clearSecureStorageOnLogout: request.clearSecureStorageOnLogout,
+            blockingScreenBuilder: request.blockingScreenBuilder,
+            onLogoutRequested: request.onLogoutRequested,
+            onRootDetected: request.onRootDetected,
+            onProxyOrVpnDetected: request.onProxyOrVpnDetected,
+            onTamperingDetected: request.onTamperingDetected,
+            uiTheme: request.uiTheme,
+            blockingLocale: request.blockingLocale,
+            messageResolver: request.messageResolver,
+            blockingTitleResolver: request.blockingTitleResolver,
+          );
+          if (!request.completer.isCompleted) {
+            request.completer.complete();
+          }
+        } catch (error, stackTrace) {
+          if (!request.completer.isCompleted) {
+            request.completer.completeError(error, stackTrace);
+          }
+        }
       }
     } finally {
-      _initDrainFuture = null;
+      _isDrainingInit = false;
       if (_pendingInitRequest != null) {
-        _initFuture = _scheduleInitDrain();
+        unawaited(_scheduleInitDrain());
       }
     }
   }
@@ -299,7 +321,7 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
     unawaited(_safeClearLifecycleSnapshot());
     _runtime.reset();
     _initFuture = null;
-    _initDrainFuture = null;
+    _isDrainingInit = false;
     _pendingInitRequest = null;
     _nowProvider = DateTime.now;
     _notifyListeners();
