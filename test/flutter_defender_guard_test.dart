@@ -4,6 +4,7 @@ import 'package:flutter_defender/flutter_defender_platform_interface.dart';
 import 'package:flutter_defender/src/platform/pigeon/defender_messages.g.dart'
     as pigeon;
 import 'package:flutter_defender/src/platform/pigeon_flutter_defender_platform.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
@@ -37,6 +38,13 @@ class FakeFlutterDefenderPlatform
         tamperingDetails: null,
       );
   final Map<String, String> secureStorage = <String, String>{};
+  bool throwOnGetRuntimeState = false;
+  bool throwOnSecureWrite = false;
+  bool throwOnSecureRead = false;
+  bool throwOnSecureDelete = false;
+  bool throwOnSecureClearAll = false;
+  Duration loadLifecycleSnapshotDelay = Duration.zero;
+  int secureClearAllCallCount = 0;
 
   @override
   Future<void> clearLifecycleSnapshot() async {
@@ -48,15 +56,27 @@ class FakeFlutterDefenderPlatform
   }
 
   @override
-  Future<pigeon.NativeRuntimeState> getRuntimeState() async => runtimeState;
+  Future<pigeon.NativeRuntimeState> getRuntimeState() async {
+    if (throwOnGetRuntimeState) {
+      throw PlatformException(code: 'runtime_state_failure');
+    }
+    return runtimeState;
+  }
 
   @override
   Future<pigeon.AdvancedSecuritySignals> getAdvancedSecuritySignals() async =>
       advancedSecuritySignals;
 
   @override
-  Future<pigeon.LifecycleSnapshot> loadLifecycleSnapshot() async =>
-      lifecycleSnapshot;
+  Future<pigeon.LifecycleSnapshot> loadLifecycleSnapshot() async {
+    if (loadLifecycleSnapshotDelay == Duration.zero) {
+      return lifecycleSnapshot;
+    }
+    return Future<pigeon.LifecycleSnapshot>.delayed(
+      loadLifecycleSnapshotDelay,
+      () => lifecycleSnapshot,
+    );
+  }
 
   @override
   Future<void> saveLifecycleSnapshot(pigeon.LifecycleSnapshot snapshot) async {
@@ -79,19 +99,34 @@ class FakeFlutterDefenderPlatform
 
   @override
   Future<void> secureWrite({required String key, required String value}) async {
+    if (throwOnSecureWrite) {
+      throw PlatformException(code: 'secure_write_failure');
+    }
     secureStorage[key] = value;
   }
 
   @override
-  Future<String?> secureRead(String key) async => secureStorage[key];
+  Future<String?> secureRead(String key) async {
+    if (throwOnSecureRead) {
+      throw PlatformException(code: 'secure_read_failure');
+    }
+    return secureStorage[key];
+  }
 
   @override
   Future<void> secureDelete(String key) async {
+    if (throwOnSecureDelete) {
+      throw PlatformException(code: 'secure_delete_failure');
+    }
     secureStorage.remove(key);
   }
 
   @override
   Future<void> secureClearAll() async {
+    secureClearAllCallCount += 1;
+    if (throwOnSecureClearAll) {
+      throw PlatformException(code: 'secure_clear_failure');
+    }
     secureStorage.clear();
   }
 
@@ -215,4 +250,102 @@ void main() {
     },
     variant: TargetPlatformVariant.only(TargetPlatform.iOS),
   );
+
+  testWidgets('secure storage helper is fail-fast on platform errors', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init(enableSecureStorageHelper: true);
+
+    fakePlatform.throwOnSecureWrite = true;
+    await expectLater(
+      defender.secureWrite(key: 'token', value: '123'),
+      throwsA(isA<PlatformException>()),
+    );
+
+    fakePlatform.throwOnSecureRead = true;
+    await expectLater(
+      defender.secureRead('token'),
+      throwsA(isA<PlatformException>()),
+    );
+
+    fakePlatform.throwOnSecureDelete = true;
+    await expectLater(
+      defender.secureDelete('token'),
+      throwsA(isA<PlatformException>()),
+    );
+
+    fakePlatform.throwOnSecureClearAll = true;
+    await expectLater(
+      defender.secureClearAll(),
+      throwsA(isA<PlatformException>()),
+    );
+  });
+
+  testWidgets(
+    'cold-start authenticated timeout clears secure storage before logout',
+    (WidgetTester tester) async {
+      defender.dispose();
+      defender = FlutterDefender.instance;
+      final DateTime base = DateTime(2026, 4, 12, 12);
+      defender.debugSetNowProvider(() => base);
+      final int oldTimestamp = base
+          .subtract(const Duration(seconds: 200))
+          .millisecondsSinceEpoch;
+      fakePlatform.lifecycleSnapshot = pigeon.LifecycleSnapshot(
+        lastBackgroundedAtMs: oldTimestamp,
+        wasAuthenticated: true,
+        activeGuardKind: pigeon.DefenderGuardKind.none,
+      );
+      var logoutCalls = 0;
+      await defender.init(
+        authenticatedBackgroundTimeoutSeconds: 20,
+        enableSecureStorageHelper: true,
+        clearSecureStorageOnLogout: true,
+        onLogoutRequested: () {
+          logoutCalls += 1;
+        },
+      );
+
+      expect(fakePlatform.secureClearAllCallCount, 1);
+      expect(logoutCalls, 1);
+    },
+  );
+
+  testWidgets('latest init call wins under concurrent calls', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    fakePlatform.loadLifecycleSnapshotDelay = const Duration(milliseconds: 100);
+
+    final Future<void> initA = defender.init(enableForegroundCheck: true);
+    final Future<void> initB = defender.init(enableForegroundCheck: false);
+    await Future.wait(<Future<void>>[initA, initB]);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates:
+            FlutterDefenderLocalizations.localizationsDelegates,
+        supportedLocales: FlutterDefenderLocalizations.supportedLocales,
+        home: const FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secure')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    fakePlatform.emitForegroundStateChanged(false);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        FlutterDefenderMessages.stringFor(
+          FlutterDefenderMessageId.foregroundRequired,
+        ),
+      ),
+      findsNothing,
+    );
+  });
 }

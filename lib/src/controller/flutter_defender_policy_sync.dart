@@ -1,6 +1,14 @@
 part of '../../flutter_defender.dart';
 
 extension _FlutterDefenderPolicySync on FlutterDefender {
+  Future<void> _requestLogout() async {
+    if (_config.enableSecureStorageHelper &&
+        _config.clearSecureStorageOnLogout) {
+      await _safeSecureClearAll();
+    }
+    _config.onLogoutRequested?.call();
+  }
+
   Future<void> _handleAppResumed() async {
     final int? pausedAtMs = _runtime.pausedAtMs;
     _runtime.pausedAtMs = null;
@@ -19,11 +27,7 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
           !_runtime.logoutTriggeredForCurrentBackground &&
           elapsedSeconds > _config.authenticatedBackgroundTimeoutSeconds) {
         _runtime.logoutTriggeredForCurrentBackground = true;
-        if (_config.enableSecureStorageHelper &&
-            _config.clearSecureStorageOnLogout) {
-          await _safeSecureClearAll();
-        }
-        _config.onLogoutRequested?.call();
+        await _requestLogout();
       }
     }
 
@@ -31,7 +35,9 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
     await _syncProtection();
   }
 
-  void _applyColdStartSnapshot(pigeon.LifecycleSnapshot snapshot) {
+  Future<void> _applyColdStartSnapshot(
+    pigeon.LifecycleSnapshot snapshot,
+  ) async {
     final int? backgroundedAtMs = snapshot.lastBackgroundedAtMs;
     if (backgroundedAtMs == null) {
       return;
@@ -44,7 +50,7 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
 
     if (wasAuthenticated &&
         elapsedSeconds > _config.authenticatedBackgroundTimeoutSeconds) {
-      _config.onLogoutRequested?.call();
+      await _requestLogout();
     }
     if (activeGuardKind == pigeon.DefenderGuardKind.otp &&
         elapsedSeconds > _config.otpBackgroundTimeoutSeconds) {

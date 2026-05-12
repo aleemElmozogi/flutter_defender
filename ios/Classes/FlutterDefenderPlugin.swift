@@ -130,14 +130,19 @@ private final class IosAdvancedSecurityDetector {
 private final class IosSecureStorageHelper {
   private let service = "flutter_defender_secure_store"
 
-  func write(key: String, value: String) {
-    guard let data = value.data(using: .utf8) else { return }
+  func write(key: String, value: String) throws {
+    guard let data = value.data(using: .utf8) else {
+      throw FlutterError(code: "storage_encoding_error", message: "Failed to encode secure value.", details: nil)
+    }
     let query: [String: Any] = [
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: service,
       kSecAttrAccount as String: key,
     ]
-    SecItemDelete(query as CFDictionary)
+    let deleteStatus = SecItemDelete(query as CFDictionary)
+    if deleteStatus != errSecSuccess && deleteStatus != errSecItemNotFound {
+      throw FlutterError(code: "storage_delete_error", message: "Failed to delete existing keychain item.", details: deleteStatus)
+    }
 
     let add: [String: Any] = [
       kSecClass as String: kSecClassGenericPassword,
@@ -146,10 +151,13 @@ private final class IosSecureStorageHelper {
       kSecValueData as String: data,
       kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
     ]
-    SecItemAdd(add as CFDictionary, nil)
+    let addStatus = SecItemAdd(add as CFDictionary, nil)
+    if addStatus != errSecSuccess {
+      throw FlutterError(code: "storage_write_error", message: "Failed to write keychain item.", details: addStatus)
+    }
   }
 
-  func read(key: String) -> String? {
+  func read(key: String) throws -> String? {
     let query: [String: Any] = [
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: service,
@@ -158,29 +166,39 @@ private final class IosSecureStorageHelper {
       kSecMatchLimit as String: kSecMatchLimitOne,
     ]
     var item: CFTypeRef?
-    guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+    let status = SecItemCopyMatching(query as CFDictionary, &item)
+    if status == errSecItemNotFound {
+      return nil
+    }
+    guard status == errSecSuccess,
           let data = item as? Data
     else {
-      return nil
+      throw FlutterError(code: "storage_read_error", message: "Failed to read keychain item.", details: status)
     }
     return String(data: data, encoding: .utf8)
   }
 
-  func delete(key: String) {
+  func delete(key: String) throws {
     let query: [String: Any] = [
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: service,
       kSecAttrAccount as String: key,
     ]
-    SecItemDelete(query as CFDictionary)
+    let status = SecItemDelete(query as CFDictionary)
+    if status != errSecSuccess && status != errSecItemNotFound {
+      throw FlutterError(code: "storage_delete_error", message: "Failed to delete keychain item.", details: status)
+    }
   }
 
-  func clearAll() {
+  func clearAll() throws {
     let query: [String: Any] = [
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: service,
     ]
-    SecItemDelete(query as CFDictionary)
+    let status = SecItemDelete(query as CFDictionary)
+    if status != errSecSuccess && status != errSecItemNotFound {
+      throw FlutterError(code: "storage_clear_error", message: "Failed to clear keychain items.", details: status)
+    }
   }
 }
 
@@ -193,6 +211,18 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
   private let flutterApi: DefenderFlutterApiProtocol
   private let securityDetector: IosAdvancedSecurityDetector
   private let secureStorageHelper: IosSecureStorageHelper
+  private let detectorQueue = DispatchQueue(
+    label: "flutter_defender.security.detector",
+    qos: .utility
+  )
+  private var advancedSignalsCache = AdvancedSecuritySignals(
+    rootedOrJailbroken: false,
+    proxyEnabled: false,
+    vpnEnabled: false,
+    debuggerAttached: false,
+    tamperingDetected: false,
+    tamperingDetails: nil
+  )
 
   private var screenshotObserver: NSObjectProtocol?
   private var captureObserver: NSObjectProtocol?
@@ -230,6 +260,7 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
     self.secureStorageHelper = IosSecureStorageHelper()
     super.init()
     startObservers()
+    scheduleSecurityRefresh()
   }
 
   public static func register(with registrar: FlutterPluginRegistrar) {
@@ -252,7 +283,11 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
     }
   }
 
-  func setProtectionState(secureActive: Bool, overlayHardeningActive: Bool) throws {}
+  func setProtectionState(secureActive: Bool, overlayHardeningActive: Bool) throws {
+    if secureActive || overlayHardeningActive {
+      scheduleSecurityRefresh()
+    }
+  }
 
   func getRuntimeState() throws -> NativeRuntimeState {
     NativeRuntimeState(
@@ -264,23 +299,23 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
   }
 
   func getAdvancedSecuritySignals() throws -> AdvancedSecuritySignals {
-    securityDetector.collectSignals()
+    advancedSignalsCache
   }
 
   func secureWrite(key: String, value: String) throws {
-    secureStorageHelper.write(key: key, value: value)
+    try secureStorageHelper.write(key: key, value: value)
   }
 
   func secureRead(key: String) throws -> String? {
-    secureStorageHelper.read(key: key)
+    try secureStorageHelper.read(key: key)
   }
 
   func secureDelete(key: String) throws {
-    secureStorageHelper.delete(key: key)
+    try secureStorageHelper.delete(key: key)
   }
 
   func secureClearAll() throws {
-    secureStorageHelper.clearAll()
+    try secureStorageHelper.clearAll()
   }
 
   func saveLifecycleSnapshot(snapshot: LifecycleSnapshot) throws {
@@ -339,6 +374,7 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
       object: nil,
       queue: .main
     ) { [weak self] _ in
+      self?.scheduleSecurityRefresh()
       self?.flutterApi.onForegroundStateChanged(active: true) { _ in }
     }
 
@@ -348,6 +384,16 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
       queue: .main
     ) { [weak self] _ in
       self?.flutterApi.onForegroundStateChanged(active: false) { _ in }
+    }
+  }
+
+  private func scheduleSecurityRefresh() {
+    detectorQueue.async { [weak self] in
+      guard let self else { return }
+      let signals = self.securityDetector.collectSignals()
+      DispatchQueue.main.async { [weak self] in
+        self?.advancedSignalsCache = signals
+      }
     }
   }
 }

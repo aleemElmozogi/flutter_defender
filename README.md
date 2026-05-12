@@ -136,6 +136,8 @@ All advanced layers are optional and configured at `init`.
   - iOS: Keychain
 - Toggle: `enableSecureStorageHelper`
 - Optional lifecycle integration: `clearSecureStorageOnLogout`
+- Failure policy: secure-storage platform errors are fail-fast and throw; only
+  missing keys return `null` from `secureRead`.
 
 ```dart
 await FlutterDefender.instance.init(
