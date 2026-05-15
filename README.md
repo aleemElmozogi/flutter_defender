@@ -247,7 +247,7 @@ await FlutterDefender.instance.init(
 | --- | --- | --- |
 | Secure screenshots / recents | Yes, via `FLAG_SECURE` | No direct equivalent |
 | Screenshot event | Android 14+ screenshot callback | Post-capture notification only |
-| Live capture / mirroring detection | Limited | Yes, via `UIScreen.isCaptured` |
+| Live capture / mirroring detection | Limited | Yes, across connected screens via `UIScreen.isCaptured` |
 | Conceal on focus loss (`inactive`) | Lifecycle-driven concealment | Yes, hides guarded content immediately |
 | Overlay protection | Mitigation-based hardening | Not supported |
 | Emulator / simulator release block | Guarded screens; optional native launch guard | Flutter/Xcode tooling blocks release simulator builds |
@@ -314,6 +314,7 @@ flutter run
 flutter analyze
 flutter test
 cd example && flutter build apk --release
+cd example && flutter build ios --simulator --debug --no-pub
 cd example && flutter test
 flutter pub publish --dry-run
 ```

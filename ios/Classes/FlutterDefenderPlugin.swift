@@ -1,5 +1,6 @@
 import Darwin
 import Flutter
+import MachO
 import Security
 import UIKit
 
@@ -82,7 +83,7 @@ private final class IosAdvancedSecurityDetector {
       return false
     }
     let http = (settings[kCFNetworkProxiesHTTPEnable as String] as? NSNumber)?.boolValue ?? false
-    let https = (settings[kCFNetworkProxiesHTTPSEnable as String] as? NSNumber)?.boolValue ?? false
+    let https = (settings["HTTPSEnable"] as? NSNumber)?.boolValue ?? false
     return http || https
   }
 
@@ -132,16 +133,22 @@ private final class IosSecureStorageHelper {
 
   func write(key: String, value: String) throws {
     guard let data = value.data(using: .utf8) else {
-      throw FlutterError(code: "storage_encoding_error", message: "Failed to encode secure value.", details: nil)
+      throw PigeonError(code: "storage_encoding_error", message: "Failed to encode secure value.", details: nil)
     }
     let query: [String: Any] = [
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: service,
       kSecAttrAccount as String: key,
     ]
-    let deleteStatus = SecItemDelete(query as CFDictionary)
-    if deleteStatus != errSecSuccess && deleteStatus != errSecItemNotFound {
-      throw FlutterError(code: "storage_delete_error", message: "Failed to delete existing keychain item.", details: deleteStatus)
+    let update: [String: Any] = [
+      kSecValueData as String: data,
+    ]
+    let updateStatus = SecItemUpdate(query as CFDictionary, update as CFDictionary)
+    if updateStatus == errSecSuccess {
+      return
+    }
+    if updateStatus != errSecItemNotFound {
+      throw PigeonError(code: "storage_write_error", message: "Failed to update keychain item.", details: Int(updateStatus))
     }
 
     let add: [String: Any] = [
@@ -153,7 +160,7 @@ private final class IosSecureStorageHelper {
     ]
     let addStatus = SecItemAdd(add as CFDictionary, nil)
     if addStatus != errSecSuccess {
-      throw FlutterError(code: "storage_write_error", message: "Failed to write keychain item.", details: addStatus)
+      throw PigeonError(code: "storage_write_error", message: "Failed to write keychain item.", details: Int(addStatus))
     }
   }
 
@@ -173,7 +180,7 @@ private final class IosSecureStorageHelper {
     guard status == errSecSuccess,
           let data = item as? Data
     else {
-      throw FlutterError(code: "storage_read_error", message: "Failed to read keychain item.", details: status)
+      throw PigeonError(code: "storage_read_error", message: "Failed to read keychain item.", details: Int(status))
     }
     return String(data: data, encoding: .utf8)
   }
@@ -186,7 +193,7 @@ private final class IosSecureStorageHelper {
     ]
     let status = SecItemDelete(query as CFDictionary)
     if status != errSecSuccess && status != errSecItemNotFound {
-      throw FlutterError(code: "storage_delete_error", message: "Failed to delete keychain item.", details: status)
+      throw PigeonError(code: "storage_delete_error", message: "Failed to delete keychain item.", details: Int(status))
     }
   }
 
@@ -197,7 +204,7 @@ private final class IosSecureStorageHelper {
     ]
     let status = SecItemDelete(query as CFDictionary)
     if status != errSecSuccess && status != errSecItemNotFound {
-      throw FlutterError(code: "storage_clear_error", message: "Failed to clear keychain items.", details: status)
+      throw PigeonError(code: "storage_clear_error", message: "Failed to clear keychain items.", details: Int(status))
     }
   }
 }
@@ -226,6 +233,8 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
 
   private var screenshotObserver: NSObjectProtocol?
   private var captureObserver: NSObjectProtocol?
+  private var screenConnectObserver: NSObjectProtocol?
+  private var screenDisconnectObserver: NSObjectProtocol?
   private var didBecomeActiveObserver: NSObjectProtocol?
   private var willResignActiveObserver: NSObjectProtocol?
 
@@ -238,7 +247,7 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
     },
     screenCaptureProvider: @escaping FlutterDefenderScreenCaptureProvider = {
       if #available(iOS 11.0, *) {
-        return UIScreen.main.isCaptured
+        return UIScreen.screens.contains { $0.isCaptured }
       }
       return false
     },
@@ -274,6 +283,12 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
     }
     if let captureObserver {
       notificationCenter.removeObserver(captureObserver)
+    }
+    if let screenConnectObserver {
+      notificationCenter.removeObserver(screenConnectObserver)
+    }
+    if let screenDisconnectObserver {
+      notificationCenter.removeObserver(screenDisconnectObserver)
     }
     if let didBecomeActiveObserver {
       notificationCenter.removeObserver(didBecomeActiveObserver)
@@ -364,8 +379,21 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
         object: nil,
         queue: .main
       ) { [weak self] _ in
-        guard let self else { return }
-        self.flutterApi.onScreenCaptureChanged(active: self.screenCaptureProvider()) { _ in }
+        self?.emitScreenCaptureState()
+      }
+      screenConnectObserver = notificationCenter.addObserver(
+        forName: UIScreen.didConnectNotification,
+        object: nil,
+        queue: .main
+      ) { [weak self] _ in
+        self?.emitScreenCaptureState()
+      }
+      screenDisconnectObserver = notificationCenter.addObserver(
+        forName: UIScreen.didDisconnectNotification,
+        object: nil,
+        queue: .main
+      ) { [weak self] _ in
+        self?.emitScreenCaptureState()
       }
     }
 
@@ -385,6 +413,10 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
     ) { [weak self] _ in
       self?.flutterApi.onForegroundStateChanged(active: false) { _ in }
     }
+  }
+
+  private func emitScreenCaptureState() {
+    flutterApi.onScreenCaptureChanged(active: screenCaptureProvider()) { _ in }
   }
 
   private func scheduleSecurityRefresh() {

@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added optional Android manifest metadata for native release-emulator blocker title, subtitle, message, and button text.
 - Added package consumer keep rules for the Android release-emulator guard and detector classes, plus R8 warning suppression for annotation-only Tink references from `androidx.security:security-crypto`.
 - Documented Android launch-guard setup, Android install-vs-launch enforcement, and iOS simulator release tooling prevention.
+- Added iOS screen connect/disconnect observers so capture state is refreshed when mirrored or external screens are attached or removed.
 
 ### Changed
 
@@ -20,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Android guarded-screen overlay hardening now reports `supportsOverlayHardening: false` after `setHideOverlayWindows(...)` is unavailable.
 - Android security signal refresh is isolated from detector exceptions and executor shutdown races.
 - Android root `su` probing now has a timeout and cleans up its spawned process.
+- iOS live capture detection now checks all connected screens instead of only `UIScreen.main`.
+- iOS secure-storage writes now update existing Keychain items in place before adding new items.
 
 ### Fixed
 
@@ -27,10 +30,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed Android screenshot callback registration/unregistration so platform callback failures do not crash plugin setup or teardown.
 - Fixed stale UI-thread protection updates from applying after an activity detach/rebind.
 - Fixed Android release guard target-activity failures to show a native configuration error instead of crashing.
+- Fixed iOS secure-storage writes so a failed add cannot remove an existing value first.
 
 ### Tests
 
-- Verified `flutter analyze`, `flutter test`, Android release APK build, and Android release emulator launch blocking.
+- Verified `flutter analyze`, `flutter test`, Android release APK build, iOS simulator debug build, and Android release emulator launch blocking.
 
 ## [0.2.4] - 2026-05-12
 
