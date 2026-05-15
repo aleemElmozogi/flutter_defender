@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Debug
 import java.io.File
 import java.net.NetworkInterface
+import java.util.concurrent.TimeUnit
 
 internal class AdvancedSecurityDetector(private val context: Context) {
     fun collectSignals(): AdvancedSecuritySignals {
@@ -60,12 +61,15 @@ internal class AdvancedSecurityDetector(private val context: Context) {
     }
 
     private fun canExecuteSu(): Boolean {
+        var process: Process? = null
         return try {
-            val process = Runtime.getRuntime().exec(arrayOf("/system/xbin/which", "su"))
-            val output = process.inputStream.bufferedReader().use { it.readText() }
-            output.isNotBlank()
+            process = Runtime.getRuntime().exec(arrayOf("/system/xbin/which", "su"))
+            val completed = process.waitFor(2, TimeUnit.SECONDS)
+            completed && process.inputStream.bufferedReader().use { it.readText() }.isNotBlank()
         } catch (_: Throwable) {
             false
+        } finally {
+            process?.destroy()
         }
     }
 

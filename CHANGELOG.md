@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-05-16
+
+### Added
+
+- Added `ReleaseEmulatorGuardActivity` for Android apps that need non-debuggable release APKs blocked before Flutter starts on emulators.
+- Added optional Android manifest metadata for native release-emulator blocker title, subtitle, message, and button text.
+- Added package consumer keep rules for the Android release-emulator guard and detector classes, plus R8 warning suppression for annotation-only Tink references from `androidx.security:security-crypto`.
+- Documented Android launch-guard setup, Android install-vs-launch enforcement, and iOS simulator release tooling prevention.
+
+### Changed
+
+- Android release-emulator launch blocking is package-owned; host apps only need a launcher manifest handoff.
+- Android guarded-screen overlay hardening now reports `supportsOverlayHardening: false` after `setHideOverlayWindows(...)` is unavailable.
+- Android security signal refresh is isolated from detector exceptions and executor shutdown races.
+- Android root `su` probing now has a timeout and cleans up its spawned process.
+
+### Fixed
+
+- Fixed Android plugin registration so `Window.setHideOverlayWindows(...)` `SecurityException`s do not prevent `flutter_defender` registration.
+- Fixed Android screenshot callback registration/unregistration so platform callback failures do not crash plugin setup or teardown.
+- Fixed stale UI-thread protection updates from applying after an activity detach/rebind.
+- Fixed Android release guard target-activity failures to show a native configuration error instead of crashing.
+
+### Tests
+
+- Verified `flutter analyze`, `flutter test`, Android release APK build, and Android release emulator launch blocking.
+
 ## [0.2.4] - 2026-05-12
 
 ### Fixed
