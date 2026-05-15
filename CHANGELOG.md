@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added package consumer keep rules for the Android release-emulator guard and detector classes, plus R8 warning suppression for annotation-only Tink references from `androidx.security:security-crypto`.
 - Documented Android launch-guard setup, Android install-vs-launch enforcement, and iOS simulator release tooling prevention.
 - Added iOS screen connect/disconnect observers so capture state is refreshed when mirrored or external screens are attached or removed.
+- Added broader iOS jailbreak and runtime-tampering indicators for Frida/Gadget artifacts, injected DYLD environment variables, suspicious runtime classes, and known instrumentation dylibs.
 
 ### Changed
 

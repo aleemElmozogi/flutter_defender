@@ -38,12 +38,20 @@ private final class IosAdvancedSecurityDetector {
     #else
       let suspiciousPaths = [
         "/Applications/Cydia.app",
+        "/Applications/Sileo.app",
+        "/Applications/Zebra.app",
         "/Library/MobileSubstrate/MobileSubstrate.dylib",
+        "/Library/PreferenceLoader/PreferenceLoader.dylib",
         "/bin/bash",
         "/usr/sbin/sshd",
         "/etc/apt",
         "/private/var/lib/apt/",
         "/private/var/stash",
+        "/private/var/jb",
+        "/var/jb",
+        "/usr/lib/libjailbreak.dylib",
+        "/usr/lib/libsubstitute.dylib",
+        "/usr/lib/substrate",
       ]
       if suspiciousPaths.contains(where: { FileManager.default.fileExists(atPath: $0) }) {
         return true
@@ -114,7 +122,50 @@ private final class IosAdvancedSecurityDetector {
   }
 
   private func isHookingDetected() -> Bool {
-    let suspicious = ["frida", "substrate", "cycript", "xposed", "libhook"]
+    hasSuspiciousDyldEnvironment() ||
+      hasSuspiciousRuntimeClass() ||
+      hasSuspiciousLoadedImage() ||
+      hasSuspiciousInstrumentationPath()
+  }
+
+  private func hasSuspiciousDyldEnvironment() -> Bool {
+    let environment = ProcessInfo.processInfo.environment
+    let suspiciousKeys = [
+      "DYLD_INSERT_LIBRARIES",
+      "DYLD_LIBRARY_PATH",
+      "DYLD_FRAMEWORK_PATH",
+    ]
+    return suspiciousKeys.contains { key in
+      environment[key]?.isEmpty == false
+    }
+  }
+
+  private func hasSuspiciousRuntimeClass() -> Bool {
+    let suspiciousClasses = [
+      "FridaGadget",
+      "FridaScriptEngine",
+      "CydiaSubstrate",
+      "SubstrateLoader",
+      "SubstrateBootstrap",
+      "MSHookFunction",
+      "CaptainHook",
+      "CYListenServer",
+    ]
+    return suspiciousClasses.contains { NSClassFromString($0) != nil }
+  }
+
+  private func hasSuspiciousLoadedImage() -> Bool {
+    let suspicious = [
+      "frida",
+      "gadget",
+      "substrate",
+      "substitute",
+      "libhooker",
+      "cycript",
+      "sslkill",
+      "flex",
+      "libcolorpicker",
+    ]
     for index in 0..<_dyld_image_count() {
       guard let rawName = _dyld_get_image_name(index) else {
         continue
@@ -125,6 +176,20 @@ private final class IosAdvancedSecurityDetector {
       }
     }
     return false
+  }
+
+  private func hasSuspiciousInstrumentationPath() -> Bool {
+    let suspiciousPaths = [
+      "/usr/sbin/frida-server",
+      "/usr/bin/frida-server",
+      "/usr/lib/frida/frida-agent.dylib",
+      "/usr/lib/frida/frida-gadget.dylib",
+      "/Library/MobileSubstrate/DynamicLibraries/FridaGadget.dylib",
+      "/Library/MobileSubstrate/DynamicLibraries/SSLKillSwitch2.dylib",
+      "/Library/MobileSubstrate/DynamicLibraries/FLEX.dylib",
+      "/Library/MobileSubstrate/DynamicLibraries/RevealServer.dylib",
+    ]
+    return suspiciousPaths.contains { FileManager.default.fileExists(atPath: $0) }
   }
 }
 
