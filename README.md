@@ -23,8 +23,62 @@ There is no route-observer setup. A guarded screen protects itself before the se
 
 ```yaml
 dependencies:
-  flutter_defender: ^0.2.4
+  flutter_defender: ^0.3.0
 ```
+
+### Android release emulator launch block
+
+`enableEmulatorDetectionRelease` blocks guarded Flutter screens in release
+builds. If you need the stricter policy where a release APK is blocked before
+Flutter starts, make the package guard activity your Android launcher and point
+it at your real Flutter activity:
+
+```xml
+<activity
+    android:name="aleem.flutter.defender.ReleaseEmulatorGuardActivity"
+    android:exported="true"
+    android:launchMode="singleTask"
+    android:taskAffinity=""
+    android:theme="@style/LaunchTheme"
+    tools:replace="android:exported">
+    <meta-data
+        android:name="aleem.flutter.defender.TARGET_ACTIVITY"
+        android:value=".MainActivity" />
+    <!-- Optional text overrides:
+    <meta-data
+        android:name="aleem.flutter.defender.BLOCK_TITLE"
+        android:value="Unsupported device" />
+    <meta-data
+        android:name="aleem.flutter.defender.BLOCK_SUBTITLE"
+        android:value="Security protection is enabled" />
+    <meta-data
+        android:name="aleem.flutter.defender.BLOCK_MESSAGE"
+        android:value="This release build cannot run on emulators." />
+    <meta-data
+        android:name="aleem.flutter.defender.BLOCK_BUTTON"
+        android:value="Close app" />
+    -->
+    <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+    </intent-filter>
+</activity>
+
+<!-- Keep your existing MainActivity settings, but remove MAIN/LAUNCHER from it. -->
+<activity
+    android:name=".MainActivity"
+    android:exported="false"
+    android:theme="@style/LaunchTheme" />
+```
+
+No Gradle change is required. Debug and profile builds remain runnable on
+emulators; non-debuggable release-like builds are blocked at launch when an
+emulator is detected. Android can still install a release APK on a compatible
+emulator, so this is launch-time enforcement rather than install prevention. If
+your manifest does not already define it, add
+`xmlns:tools="http://schemas.android.com/tools"` to the root `<manifest>` tag.
+If `TARGET_ACTIVITY` is wrong, the native guard shows a configuration error and
+logs the missing activity instead of crashing.
 
 ## Quick Start
 
@@ -193,10 +247,10 @@ await FlutterDefender.instance.init(
 | --- | --- | --- |
 | Secure screenshots / recents | Yes, via `FLAG_SECURE` | No direct equivalent |
 | Screenshot event | Android 14+ screenshot callback | Post-capture notification only |
-| Live capture / mirroring detection | Limited | Yes, via `UIScreen.isCaptured` |
+| Live capture / mirroring detection | Limited | Yes, across connected screens via `UIScreen.isCaptured` |
 | Conceal on focus loss (`inactive`) | Lifecycle-driven concealment | Yes, hides guarded content immediately |
 | Overlay protection | Mitigation-based hardening | Not supported |
-| Emulator / simulator release block | Yes | Yes |
+| Emulator / simulator release block | Guarded screens; optional native launch guard | Flutter/Xcode tooling blocks release simulator builds |
 | Root / jailbreak detection | Yes (best-effort indicators) | Yes (best-effort indicators) |
 | Proxy / VPN detection | Yes | Yes |
 | Basic RASP (debugger / hooking) | Yes | Yes |
@@ -206,7 +260,7 @@ Important limitations:
 - **Android overlay defense is mitigation-based.** The plugin hardens guarded screens and reports obscured-touch violations; it does not claim perfect detection of every hostile overlay.
 - **iOS screenshot detection is after capture.** The system screenshot has already happened when the notification arrives.
 - **iOS uses privacy concealment, not hostile-overlay detection.** Guarded content is hidden when the app becomes inactive, such as during Control Center, Notification Center, Siri, calls, or app-switcher transitions.
-- **Release-only emulator/simulator blocking** applies on guarded screens when `enableEmulatorDetectionRelease` is enabled.
+- **Release-only emulator/simulator blocking** applies on guarded screens when `enableEmulatorDetectionRelease` is enabled. On Android, the optional package launcher guard blocks release-like emulator launches before Flutter starts. On iOS, `flutter build ios --simulator --release` is already rejected by Flutter/Xcode tooling.
 
 ## Background Timeout Behavior
 
@@ -259,6 +313,8 @@ flutter run
 ```bash
 flutter analyze
 flutter test
+cd example && flutter build apk --release
+cd example && flutter build ios --simulator --debug --no-pub
 cd example && flutter test
 flutter pub publish --dry-run
 ```
@@ -270,7 +326,7 @@ This repository includes GitHub Actions for CI and publishing:
 - Pull requests run package and example analysis plus tests.
 - Pushes to `main` / `master` rerun those checks, verify that `pubspec.yaml`
   contains a version higher than the previous branch tip, and then create a
-  matching Git tag such as `v0.2.1`.
+  matching Git tag such as `v0.3.0`.
 - Pushing that tag triggers the publish workflow, which runs a final
   `flutter pub publish --dry-run` and then publishes to pub.dev.
 

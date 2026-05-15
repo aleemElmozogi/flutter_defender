@@ -2,6 +2,7 @@ package aleem.flutter.defender
 
 import android.app.Activity
 import android.os.Build
+import android.util.Log
 import android.view.ViewTreeObserver
 import android.view.Window
 import android.view.WindowManager
@@ -10,8 +11,13 @@ import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 
 class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
+    private companion object {
+        const val TAG = "FlutterDefender"
+    }
+
     private var activity: Activity? = null
     private var flutterApi: DefenderFlutterApi? = null
     private var snapshotStore: LifecycleSnapshotStore? = null
@@ -23,6 +29,7 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
     private var windowCallbackWrapper: OverlayAwareWindowCallback? = null
     private var secureActive = false
     private var overlayHardeningActive = false
+    private var hideOverlayWindowsAvailable = true
     @Volatile
     private var advancedSecuritySignalsCache = AdvancedSecuritySignals(
         rootedOrJailbroken = false,
@@ -84,7 +91,8 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
             isForeground = currentForegroundState(),
             isScreenCaptured = false,
             isEmulator = EmulatorDetector.isEmulator(),
-            supportsOverlayHardening = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+            supportsOverlayHardening = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                hideOverlayWindowsAvailable
         )
     }
 
@@ -146,13 +154,25 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
     private fun applyProtectionState() {
         val activeActivity = activity ?: return
         activeActivity.runOnUiThread {
+            if (activity !== activeActivity) {
+                return@runOnUiThread
+            }
             if (secureActive) {
                 activeActivity.window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
             } else {
                 activeActivity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                activeActivity.window.setHideOverlayWindows(overlayHardeningActive)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && hideOverlayWindowsAvailable) {
+                try {
+                    activeActivity.window.setHideOverlayWindows(overlayHardeningActive)
+                } catch (error: SecurityException) {
+                    hideOverlayWindowsAvailable = false
+                    Log.w(
+                        TAG,
+                        "System overlay hiding is unavailable; continuing with fallback overlay hardening.",
+                        error
+                    )
+                }
             }
             activeActivity.window.decorView.setFilterTouchesRecursively(overlayHardeningActive)
             updateWindowCallback(activeActivity.window)
@@ -193,15 +213,24 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
             return
         }
         val callback = Activity.ScreenCaptureCallback { flutterApi?.onScreenshotDetected {} }
-        activeActivity.registerScreenCaptureCallback(activeActivity.mainExecutor, callback)
-        screenCaptureCallbackHandle = callback
+        try {
+            activeActivity.registerScreenCaptureCallback(activeActivity.mainExecutor, callback)
+            screenCaptureCallbackHandle = callback
+        } catch (error: RuntimeException) {
+            screenCaptureCallbackHandle = null
+            Log.w(TAG, "Screen-capture callback registration failed; continuing without callback.", error)
+        }
     }
 
     private fun unregisterScreenCaptureCallback() {
         val activeActivity = activity ?: return
         val callback = screenCaptureCallbackHandle as? Activity.ScreenCaptureCallback ?: return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            activeActivity.unregisterScreenCaptureCallback(callback)
+            try {
+                activeActivity.unregisterScreenCaptureCallback(callback)
+            } catch (error: RuntimeException) {
+                Log.w(TAG, "Screen-capture callback unregistration failed.", error)
+            }
         }
         screenCaptureCallbackHandle = null
     }
@@ -242,8 +271,16 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
     private fun scheduleSecurityRefresh() {
         val detector = advancedSecurityDetector ?: return
         val executor = detectorExecutor ?: return
-        executor.execute {
-            advancedSecuritySignalsCache = detector.collectSignals()
+        try {
+            executor.execute {
+                try {
+                    advancedSecuritySignalsCache = detector.collectSignals()
+                } catch (error: Throwable) {
+                    Log.w(TAG, "Advanced security signal refresh failed.", error)
+                }
+            }
+        } catch (error: RejectedExecutionException) {
+            Log.w(TAG, "Advanced security signal refresh was rejected.", error)
         }
     }
 }

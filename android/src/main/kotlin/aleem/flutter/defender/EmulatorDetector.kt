@@ -2,7 +2,7 @@ package aleem.flutter.defender
 
 import android.os.Build
 
-internal object EmulatorDetector {
+object EmulatorDetector {
     fun isEmulator(): Boolean {
         return Build.FINGERPRINT.startsWith("generic") ||
             Build.FINGERPRINT.startsWith("unknown") ||
