@@ -332,8 +332,6 @@ This repository includes GitHub Actions for CI and publishing:
 
 Important notes:
 
-- The first release of a new package must still be published manually with
-  `dart pub publish` / `flutter pub publish`.
 - Pub.dev automated publishing from GitHub Actions only works for workflows
   triggered by tag pushes, so the main-branch workflow tags the release and the
   tag workflow performs the actual publish.
