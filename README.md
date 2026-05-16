@@ -337,6 +337,11 @@ Important notes:
 - Pub.dev automated publishing from GitHub Actions only works for workflows
   triggered by tag pushes, so the main-branch workflow tags the release and the
   tag workflow performs the actual publish.
+- GitHub does not start another workflow when a workflow pushes a tag with the
+  default `GITHUB_TOKEN`. Add an Actions secret named `RELEASE_TAG_TOKEN`
+  containing a fine-grained personal access token with repository
+  `Contents: Read and write`; the release-tag workflow uses it only to push the
+  release tag so `publish.yml` can run.
 - Configure automated publishing for this package on pub.dev and require the
   GitHub Actions environment named `pub.dev` to match the publish workflow.
 
