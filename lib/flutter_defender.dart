@@ -9,6 +9,7 @@ import 'flutter_defender_platform_interface.dart';
 import 'l10n/flutter_defender_localizations.dart';
 import 'src/core/flutter_defender_config.dart';
 import 'src/core/flutter_defender_runtime_state.dart';
+import 'src/native/flutter_defender_native.dart';
 import 'src/platform/pigeon/defender_messages.g.dart' as pigeon;
 import 'src/ui/blocking_screen.dart';
 import 'src/ui/flutter_defender_message_id.dart';
@@ -17,6 +18,7 @@ import 'src/ui/flutter_defender_ui_theme.dart';
 
 export 'flutter_defender_localization_support.dart';
 export 'l10n/flutter_defender_localizations.dart';
+export 'src/network/flutter_defender_request_signer.dart';
 export 'src/ui/blocking_screen.dart';
 export 'src/ui/flutter_defender_message_id.dart';
 export 'src/ui/flutter_defender_messages.dart';

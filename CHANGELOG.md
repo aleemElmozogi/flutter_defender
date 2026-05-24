@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-05-24
+
+### Added
+
+- Added a native C++ FFI core for debugger, root/jailbreak, emulator, and hooking-artifact signals.
+- Added native HMAC-SHA256 request signing through `FlutterDefenderRequestSigner`.
+- Added Android CMake packaging for `libflutter_defender.so`.
+- Added iOS Podspec source inclusion for the native C++ core.
+
+### Changed
+
+- RASP signals now merge native C++ checks with the existing platform detector fallback.
+- Android native builds no longer pin a specific CMake patch version.
+
+### Tests
+
+- Verified `flutter analyze`, `flutter test`, Android debug APK build, Android release APK build, and the native HMAC-SHA256 test vector.
+
 ## [0.3.0] - 2026-05-16
 
 ### Added
@@ -137,5 +155,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Example app with locale switching and blocking UI preview.
 - `README.md`, `LICENSE` (Apache-2.0), and `.gitignore` coverage for package and example.
 - GitHub Actions workflow to run package and example `flutter test` on pull requests and pushes to `main` / `master`.
-
-When you publish the repo, add compare/release links at the bottom of this file (see [Keep a Changelog](https://keepachangelog.com/) footer examples).
