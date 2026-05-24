@@ -23,7 +23,7 @@ There is no route-observer setup. A guarded screen protects itself before the se
 
 ```yaml
 dependencies:
-  flutter_defender: ^0.3.0
+  flutter_defender: ^0.4.0
 ```
 
 ### Android release emulator launch block
@@ -179,9 +179,31 @@ All advanced layers are optional and configured at `init`.
 
 ### Basic RASP
 
-- Detects debugger attachment and common hooking artifacts (best-effort).
+- Uses a native C++ FFI core for debugger, root/jailbreak, emulator, and
+  common hooking-artifact signals, merged with the platform detector fallback.
 - Callback: `onTamperingDetected`
 - Policy toggle: `enableRaspDetection`
+
+### Request Signing
+
+`FlutterDefenderRequestSigner` signs `timestamp.rawBodyBytes` using native
+HMAC-SHA256 and returns headers you can attach to outgoing requests. Validate
+the signature server-side using the same timestamp, exact raw body bytes, and
+salt.
+
+```dart
+final signer = FlutterDefenderRequestSigner(
+  secretSalt: 'your_obfuscated_salt',
+);
+
+final body = jsonEncode({'amount': 100});
+final signed = signer.signString(body: body);
+
+final headers = <String, String>{
+  ...signed.headers,
+  'Content-Type': 'application/json',
+};
+```
 
 ### Secure Storage Helper (Optional)
 
@@ -326,17 +348,20 @@ This repository includes GitHub Actions for CI and publishing:
 - Pull requests run package and example analysis plus tests.
 - Pushes to `main` / `master` rerun those checks, verify that `pubspec.yaml`
   contains a version higher than the previous branch tip, and then create a
-  matching Git tag such as `v0.3.0`.
+  matching Git tag such as `v0.4.0`.
 - Pushing that tag triggers the publish workflow, which runs a final
   `flutter pub publish --dry-run` and then publishes to pub.dev.
 
 Important notes:
 
-- The first release of a new package must still be published manually with
-  `dart pub publish` / `flutter pub publish`.
 - Pub.dev automated publishing from GitHub Actions only works for workflows
   triggered by tag pushes, so the main-branch workflow tags the release and the
   tag workflow performs the actual publish.
+- GitHub does not start another workflow when a workflow pushes a tag with the
+  default `GITHUB_TOKEN`. Add an Actions secret named `RELEASE_TAG_TOKEN`
+  containing a fine-grained personal access token with repository
+  `Contents: Read and write`; the release-tag workflow uses it only to push the
+  release tag so `publish.yml` can run.
 - Configure automated publishing for this package on pub.dev and require the
   GitHub Actions environment named `pub.dev` to match the publish workflow.
 

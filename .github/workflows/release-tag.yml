@@ -80,9 +80,16 @@ jobs:
           fi
 
       - name: Create and push release tag
+        env:
+          RELEASE_TAG_TOKEN: ${{ secrets.RELEASE_TAG_TOKEN }}
         run: |
+          if [ -z "$RELEASE_TAG_TOKEN" ]; then
+            echo "Missing RELEASE_TAG_TOKEN secret. Create a fine-grained PAT with Contents: Read and write so tag pushes can trigger the publish workflow." >&2
+            exit 1
+          fi
+
           tag="v${{ steps.current_version.outputs.value }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag "$tag" "$GITHUB_SHA"
-          git push origin "$tag"
+          git push "https://x-access-token:${RELEASE_TAG_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$tag"

@@ -16,13 +16,23 @@ extension _FlutterDefenderPlatformSafety on FlutterDefender {
   }
 
   Future<pigeon.NativeRuntimeState> _safeGetRuntimeState() async {
+    final bool nativeEmulatorDetected = FlutterDefenderNative.instance
+        .detectEmulator();
     try {
-      return await _platform.getRuntimeState();
+      final pigeon.NativeRuntimeState runtimeState = await _platform
+          .getRuntimeState();
+      return pigeon.NativeRuntimeState(
+        isForeground: runtimeState.isForeground,
+        isScreenCaptured: runtimeState.isScreenCaptured,
+        isEmulator:
+            (runtimeState.isEmulator ?? false) || nativeEmulatorDetected,
+        supportsOverlayHardening: runtimeState.supportsOverlayHardening,
+      );
     } catch (_) {
       return pigeon.NativeRuntimeState(
         isForeground: true,
         isScreenCaptured: false,
-        isEmulator: false,
+        isEmulator: nativeEmulatorDetected,
         supportsOverlayHardening: false,
       );
     }
@@ -30,17 +40,69 @@ extension _FlutterDefenderPlatformSafety on FlutterDefender {
 
   Future<pigeon.AdvancedSecuritySignals>
   _safeGetAdvancedSecuritySignals() async {
+    final NativeDefenderSignals nativeSignals = FlutterDefenderNative.instance
+        .collectSignals();
     try {
-      return await _platform.getAdvancedSecuritySignals();
+      final pigeon.AdvancedSecuritySignals signals = await _platform
+          .getAdvancedSecuritySignals();
+      return _mergeNativeSecuritySignals(signals, nativeSignals);
     } catch (_) {
       return pigeon.AdvancedSecuritySignals(
-        rootedOrJailbroken: false,
+        rootedOrJailbroken: nativeSignals.rootedOrJailbroken,
         proxyEnabled: false,
         vpnEnabled: false,
-        debuggerAttached: false,
-        tamperingDetected: false,
+        debuggerAttached: nativeSignals.debuggerAttached,
+        tamperingDetected: nativeSignals.tamperingDetected,
+        tamperingDetails: _nativeTamperingDetails(nativeSignals),
       );
     }
+  }
+
+  pigeon.AdvancedSecuritySignals _mergeNativeSecuritySignals(
+    pigeon.AdvancedSecuritySignals signals,
+    NativeDefenderSignals nativeSignals,
+  ) {
+    return pigeon.AdvancedSecuritySignals(
+      rootedOrJailbroken:
+          (signals.rootedOrJailbroken ?? false) ||
+          nativeSignals.rootedOrJailbroken,
+      proxyEnabled: signals.proxyEnabled,
+      vpnEnabled: signals.vpnEnabled,
+      debuggerAttached:
+          (signals.debuggerAttached ?? false) || nativeSignals.debuggerAttached,
+      tamperingDetected:
+          (signals.tamperingDetected ?? false) ||
+          nativeSignals.tamperingDetected,
+      tamperingDetails: _mergeTamperingDetails(
+        signals.tamperingDetails,
+        _nativeTamperingDetails(nativeSignals),
+      ),
+    );
+  }
+
+  String? _nativeTamperingDetails(NativeDefenderSignals nativeSignals) {
+    final List<String> details = <String>[];
+    if (nativeSignals.debuggerAttached) {
+      details.add('native-debugger');
+    }
+    if (nativeSignals.tamperingDetected) {
+      details.add('native-tampering');
+    }
+    if (nativeSignals.rootedOrJailbroken) {
+      details.add('native-root-jailbreak');
+    }
+    return details.isEmpty ? null : details.join(',');
+  }
+
+  String? _mergeTamperingDetails(
+    String? platformDetails,
+    String? nativeDetails,
+  ) {
+    final Set<String> details = <String>{
+      ...?platformDetails?.split(',').where((String value) => value.isNotEmpty),
+      ...?nativeDetails?.split(',').where((String value) => value.isNotEmpty),
+    };
+    return details.isEmpty ? null : details.join(',');
   }
 
   Future<void> _safeSecureWrite({
