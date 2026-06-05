@@ -1,121 +1,332 @@
 import 'dart:async';
+import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'flutter_defender_localization_support.dart';
-import 'l10n/flutter_defender_localizations.dart';
-
-import 'src/blocking_screen.dart';
-import 'src/flutter_defender_config.dart';
-import 'src/flutter_defender_message_id.dart';
-import 'src/flutter_defender_messages.dart';
-import 'src/flutter_defender_navigator_observer.dart';
-import 'src/flutter_defender_runtime_state.dart';
-import 'src/flutter_defender_ui_theme.dart';
 import 'flutter_defender_platform_interface.dart';
+import 'l10n/flutter_defender_localizations.dart';
+import 'src/core/flutter_defender_config.dart';
+import 'src/core/flutter_defender_runtime_state.dart';
+import 'src/native/flutter_defender_native.dart';
+import 'src/platform/pigeon/defender_messages.g.dart' as pigeon;
+import 'src/ui/blocking_screen.dart';
+import 'src/ui/flutter_defender_message_id.dart';
+import 'src/ui/flutter_defender_messages.dart';
+import 'src/ui/flutter_defender_ui_theme.dart';
 
 export 'flutter_defender_localization_support.dart';
 export 'l10n/flutter_defender_localizations.dart';
-export 'src/blocking_screen.dart';
-export 'src/flutter_defender_message_id.dart';
-export 'src/flutter_defender_messages.dart';
-export 'src/flutter_defender_navigator_observer.dart';
-export 'src/flutter_defender_ui_theme.dart';
+export 'src/network/flutter_defender_request_signer.dart';
+export 'src/ui/blocking_screen.dart';
+export 'src/ui/flutter_defender_message_id.dart';
+export 'src/ui/flutter_defender_messages.dart';
+export 'src/ui/flutter_defender_ui_theme.dart';
 
-class FlutterDefender with WidgetsBindingObserver {
-  FlutterDefender._internal() {
-    navigatorObserver.addListener(_handleRouteChanged);
-  }
+part 'src/ui/flutter_defender_blocking_ui.dart';
+part 'src/controller/flutter_defender_guard_management.dart';
+part 'src/ui/flutter_defender_guard_widgets.dart';
+part 'src/controller/flutter_defender_init.dart';
+part 'src/controller/flutter_defender_platform_safety.dart';
+part 'src/controller/flutter_defender_policy_blocking.dart';
+part 'src/controller/flutter_defender_policy_sync.dart';
+
+class _GuardBinding {
+  _GuardBinding({required this.type, required this.popRoute});
+
+  final FlutterDefenderGuardType type;
+  final VoidCallback popRoute;
+}
+
+class _DefenderNotifier extends ChangeNotifier {
+  void emit() => notifyListeners();
+}
+
+class _PendingInitRequest {
+  _PendingInitRequest({
+    required this.otpBackgroundTimeoutSeconds,
+    required this.authenticatedBackgroundTimeoutSeconds,
+    required this.enableForegroundCheck,
+    required this.enableEmulatorDetectionRelease,
+    required this.enableRootDetection,
+    required this.enableProxyVpnDetection,
+    required this.enableRaspDetection,
+    required this.enableSecureStorageHelper,
+    required this.clearSecureStorageOnLogout,
+    required this.blockingScreenBuilder,
+    required this.onLogoutRequested,
+    required this.onRootDetected,
+    required this.onProxyOrVpnDetected,
+    required this.onTamperingDetected,
+    required this.uiTheme,
+    required this.blockingLocale,
+    required this.messageResolver,
+    required this.blockingTitleResolver,
+    required this.completer,
+  });
+
+  final int otpBackgroundTimeoutSeconds;
+  final int authenticatedBackgroundTimeoutSeconds;
+  final bool enableForegroundCheck;
+  final bool enableEmulatorDetectionRelease;
+  final bool enableRootDetection;
+  final bool enableProxyVpnDetection;
+  final bool enableRaspDetection;
+  final bool enableSecureStorageHelper;
+  final bool clearSecureStorageOnLogout;
+  final Widget Function(String message)? blockingScreenBuilder;
+  final VoidCallback? onLogoutRequested;
+  final VoidCallback? onRootDetected;
+  final VoidCallback? onProxyOrVpnDetected;
+  final VoidCallback? onTamperingDetected;
+  final FlutterDefenderUiTheme uiTheme;
+  final Locale? blockingLocale;
+  final String Function(BuildContext context, FlutterDefenderMessageId id)?
+  messageResolver;
+  final String Function(BuildContext context)? blockingTitleResolver;
+  final Completer<void> completer;
+}
+
+class FlutterDefender with WidgetsBindingObserver implements Listenable {
+  FlutterDefender._internal();
 
   static final FlutterDefender instance = FlutterDefender._internal();
 
   factory FlutterDefender() => instance;
 
-  final FlutterDefenderNavigatorObserver navigatorObserver =
-      FlutterDefenderNavigatorObserver();
-  FlutterDefenderConfig _config = const FlutterDefenderConfig();
   final FlutterDefenderRuntimeState _runtime = FlutterDefenderRuntimeState();
+  final LinkedHashMap<Object, _GuardBinding> _activeGuards =
+      LinkedHashMap<Object, _GuardBinding>();
+  final _DefenderNotifier _notifier = _DefenderNotifier();
 
-  Future<String?> getPlatformVersion() {
-    return FlutterDefenderPlatform.instance.getPlatformVersion();
-  }
+  FlutterDefenderConfig _config = const FlutterDefenderConfig();
+  Future<void>? _initFuture;
+  bool _isDrainingInit = false;
+  _PendingInitRequest? _pendingInitRequest;
+  bool _observerRegistered = false;
+  int _syncGeneration = 0;
+  DateTime Function() _nowProvider = DateTime.now;
+
+  FlutterDefenderPlatform get _platform => FlutterDefenderPlatform.instance;
+
+  bool get hasBlockingOverlay =>
+      _activeGuards.isNotEmpty && _runtime.blockingMessageId.value != null;
+
+  bool get shouldConcealGuardedContent => _runtime.shouldConcealGuardedContent;
+
+  @visibleForTesting
+  void debugSetNowProvider(DateTime Function() provider) =>
+      _nowProvider = provider;
+
+  @visibleForTesting
+  void debugResetNowProvider() => _nowProvider = DateTime.now;
 
   Future<void> init({
-    required List<String> sensitiveRoutes,
-    required String otpRouteName,
     int otpBackgroundTimeoutSeconds = 60,
-    int pinBackgroundTimeoutSeconds = 120,
-    bool enableOverlayDetection = true,
+    int authenticatedBackgroundTimeoutSeconds = 120,
+    @Deprecated(
+      'Use authenticatedBackgroundTimeoutSeconds instead. '
+      'This timeout applies to the authenticated session, not a specific PIN page.',
+    )
+    int? pinBackgroundTimeoutSeconds,
     bool enableForegroundCheck = true,
     bool enableEmulatorDetectionRelease = true,
+    bool? enableRootDetection,
+    bool? enableProxyVpnDetection,
+    bool? enableRaspDetection,
+    bool enableSecureStorageHelper = false,
+    bool clearSecureStorageOnLogout = false,
     Widget Function(String message)? blockingScreenBuilder,
     VoidCallback? onLogoutRequested,
+    VoidCallback? onRootDetected,
+    VoidCallback? onProxyOrVpnDetected,
+    VoidCallback? onTamperingDetected,
     FlutterDefenderUiTheme uiTheme = FlutterDefenderUiTheme.defaults,
     Locale? blockingLocale,
     String Function(BuildContext context, FlutterDefenderMessageId id)?
-        messageResolver,
+    messageResolver,
     String Function(BuildContext context)? blockingTitleResolver,
-  }) async {
-    _config = FlutterDefenderConfig.fromInit(
-      sensitiveRoutes: sensitiveRoutes,
-      otpRouteName: otpRouteName,
+  }) {
+    final int resolvedAuthenticatedBackgroundTimeoutSeconds =
+        pinBackgroundTimeoutSeconds ?? authenticatedBackgroundTimeoutSeconds;
+    final bool releaseEnabledByDefault = kReleaseMode;
+    final Completer<void> completer = Completer<void>();
+    if (_pendingInitRequest != null &&
+        !_pendingInitRequest!.completer.isCompleted) {
+      _pendingInitRequest!.completer.complete();
+    }
+    _pendingInitRequest = _PendingInitRequest(
       otpBackgroundTimeoutSeconds: otpBackgroundTimeoutSeconds,
-      pinBackgroundTimeoutSeconds: pinBackgroundTimeoutSeconds,
-      enableOverlayDetection: enableOverlayDetection,
+      authenticatedBackgroundTimeoutSeconds:
+          resolvedAuthenticatedBackgroundTimeoutSeconds,
       enableForegroundCheck: enableForegroundCheck,
       enableEmulatorDetectionRelease: enableEmulatorDetectionRelease,
+      enableRootDetection: enableRootDetection ?? releaseEnabledByDefault,
+      enableProxyVpnDetection:
+          enableProxyVpnDetection ?? releaseEnabledByDefault,
+      enableRaspDetection: enableRaspDetection ?? releaseEnabledByDefault,
+      enableSecureStorageHelper: enableSecureStorageHelper,
+      clearSecureStorageOnLogout: clearSecureStorageOnLogout,
       blockingScreenBuilder: blockingScreenBuilder,
       onLogoutRequested: onLogoutRequested,
+      onRootDetected: onRootDetected,
+      onProxyOrVpnDetected: onProxyOrVpnDetected,
+      onTamperingDetected: onTamperingDetected,
       uiTheme: uiTheme,
       blockingLocale: blockingLocale,
       messageResolver: messageResolver,
       blockingTitleResolver: blockingTitleResolver,
+      completer: completer,
     );
 
-    FlutterDefenderPlatform.instance.setMethodCallHandler(
-      _handleNativeCallback,
-    );
+    final Future<void> future = completer.future;
+    unawaited(_scheduleInitDrain());
+    _initFuture = future;
+    return future;
+  }
 
-    if (!_runtime.initialized) {
-      WidgetsBinding.instance.addObserver(this);
-      _runtime.initialized = true;
+  Future<void> _scheduleInitDrain() async {
+    if (_isDrainingInit) {
+      return;
     }
+    _isDrainingInit = true;
+    await _drainInitQueue();
+  }
 
-    _runtime.screenCaptureActive = await _safeIsScreenCaptured();
+  Future<void> _drainInitQueue() async {
+    try {
+      while (_pendingInitRequest != null) {
+        final _PendingInitRequest request = _pendingInitRequest!;
+        _pendingInitRequest = null;
+        try {
+          await _performInit(
+            otpBackgroundTimeoutSeconds: request.otpBackgroundTimeoutSeconds,
+            authenticatedBackgroundTimeoutSeconds:
+                request.authenticatedBackgroundTimeoutSeconds,
+            enableForegroundCheck: request.enableForegroundCheck,
+            enableEmulatorDetectionRelease:
+                request.enableEmulatorDetectionRelease,
+            enableRootDetection: request.enableRootDetection,
+            enableProxyVpnDetection: request.enableProxyVpnDetection,
+            enableRaspDetection: request.enableRaspDetection,
+            enableSecureStorageHelper: request.enableSecureStorageHelper,
+            clearSecureStorageOnLogout: request.clearSecureStorageOnLogout,
+            blockingScreenBuilder: request.blockingScreenBuilder,
+            onLogoutRequested: request.onLogoutRequested,
+            onRootDetected: request.onRootDetected,
+            onProxyOrVpnDetected: request.onProxyOrVpnDetected,
+            onTamperingDetected: request.onTamperingDetected,
+            uiTheme: request.uiTheme,
+            blockingLocale: request.blockingLocale,
+            messageResolver: request.messageResolver,
+            blockingTitleResolver: request.blockingTitleResolver,
+          );
+          if (!request.completer.isCompleted) {
+            request.completer.complete();
+          }
+        } catch (error, stackTrace) {
+          if (!request.completer.isCompleted) {
+            request.completer.completeError(error, stackTrace);
+          }
+        }
+      }
+    } finally {
+      _isDrainingInit = false;
+      if (_pendingInitRequest != null) {
+        unawaited(_scheduleInitDrain());
+      }
+    }
+  }
 
-    if (kReleaseMode && _config.enableEmulatorDetectionRelease) {
-      _runtime.emulatorBlocked = await _safeIsEmulator();
-      if (_runtime.emulatorBlocked) {
-        _showBlockingOverlay(
-          messageId: FlutterDefenderMessageId.emulatorReleaseBlocked,
-          source: DefenderBlockingSource.emulator,
+  void setAuthenticated(bool authenticated) {
+    _runtime
+      ..isAuthenticated = authenticated
+      ..logoutTriggeredForCurrentBackground = false;
+    if (!authenticated) {
+      _runtime.pausedAtMs = null;
+      if (_config.enableSecureStorageHelper &&
+          _config.clearSecureStorageOnLogout) {
+        unawaited(
+          _safeSecureClearAll().catchError((Object _, StackTrace _) {
+            // Keep setter signature synchronous; fail-fast semantics are enforced
+            // in async timeout/logout paths and direct storage API calls.
+          }),
         );
       }
     }
-
-    await _refreshRouteProtection();
+    unawaited(
+      _persistLifecycleSnapshot(lastBackgroundedAtMs: _runtime.pausedAtMs),
+    );
   }
 
-  /// Notifies the plugin whether the user is logged in. Call with `true` after
-  /// a successful login and `false` on logout. PIN/session background timeout
-  /// applies only while this is `true` (OTP timeout still uses the OTP route
-  /// name passed to `FlutterDefender.init`).
-  void setAuthenticated(bool authenticated) {
-    _runtime.isAuthenticated = authenticated;
-    if (!authenticated) {
-      _runtime.pausedAt = null;
+  Future<void> secureWrite({required String key, required String value}) async {
+    if (!_config.enableSecureStorageHelper) {
+      throw StateError(
+        'Secure storage helper is disabled. Enable it with '
+        'enableSecureStorageHelper: true in FlutterDefender.init().',
+      );
     }
+    await _safeSecureWrite(key: key, value: value);
   }
+
+  Future<String?> secureRead(String key) async {
+    if (!_config.enableSecureStorageHelper) {
+      throw StateError(
+        'Secure storage helper is disabled. Enable it with '
+        'enableSecureStorageHelper: true in FlutterDefender.init().',
+      );
+    }
+    return _safeSecureRead(key);
+  }
+
+  Future<void> secureDelete(String key) async {
+    if (!_config.enableSecureStorageHelper) {
+      throw StateError(
+        'Secure storage helper is disabled. Enable it with '
+        'enableSecureStorageHelper: true in FlutterDefender.init().',
+      );
+    }
+    await _safeSecureDelete(key);
+  }
+
+  Future<void> secureClearAll() async {
+    if (!_config.enableSecureStorageHelper) {
+      throw StateError(
+        'Secure storage helper is disabled. Enable it with '
+        'enableSecureStorageHelper: true in FlutterDefender.init().',
+      );
+    }
+    await _safeSecureClearAll();
+  }
+
+  @override
+  void addListener(VoidCallback listener) => _notifier.addListener(listener);
+
+  @override
+  void removeListener(VoidCallback listener) =>
+      _notifier.removeListener(listener);
 
   void dispose() {
-    if (_runtime.initialized) {
+    if (_observerRegistered) {
       WidgetsBinding.instance.removeObserver(this);
+      _observerRegistered = false;
     }
+    _platform.setCallbacks(null);
+    _activeGuards.clear();
+    unawaited(
+      _platform.setProtectionState(
+        secureActive: false,
+        overlayHardeningActive: false,
+      ),
+    );
+    unawaited(_safeClearLifecycleSnapshot());
     _runtime.reset();
-    navigatorObserver.reset();
-    FlutterDefenderPlatform.instance.setMethodCallHandler(null);
+    _initFuture = null;
+    _isDrainingInit = false;
+    _pendingInitRequest = null;
+    _nowProvider = DateTime.now;
+    _notifyListeners();
   }
 
   @override
@@ -124,353 +335,45 @@ class FlutterDefender with WidgetsBindingObserver {
       return;
     }
     switch (state) {
+      case AppLifecycleState.inactive:
+        _setInactivePrivacyShield(active: _shouldShieldOnInactive);
+        if (_runtime.pausedAtMs == null) {
+          final int nowMs = _nowProvider().millisecondsSinceEpoch;
+          _runtime
+            ..pausedAtMs = nowMs
+            ..logoutTriggeredForCurrentBackground = false;
+          unawaited(_persistLifecycleSnapshot(lastBackgroundedAtMs: nowMs));
+        }
+        break;
+      case AppLifecycleState.hidden:
+        break;
       case AppLifecycleState.paused:
-        _runtime.pausedAt = DateTime.now();
+        _setInactivePrivacyShield(active: false);
+        final int nowMs = _nowProvider().millisecondsSinceEpoch;
+        _runtime
+          ..pausedAtMs = nowMs
+          ..logoutTriggeredForCurrentBackground = false;
+        unawaited(_persistLifecycleSnapshot(lastBackgroundedAtMs: nowMs));
         break;
       case AppLifecycleState.resumed:
+        _setInactivePrivacyShield(active: false);
         unawaited(_handleAppResumed());
         break;
       case AppLifecycleState.detached:
-      case AppLifecycleState.hidden:
-      case AppLifecycleState.inactive:
         break;
     }
   }
 
-  Future<dynamic> _handleNativeCallback(MethodCall call) async {
-    switch (call.method) {
-      case 'onScreenshotAttempted':
-        if (_runtime.isRouteSensitive) {
-          _showTemporaryBlockingOverlay(
-            messageId: FlutterDefenderMessageId.screenshotsBlocked,
-          );
-        }
-        break;
-      case 'onScreenCaptureChanged':
-        _runtime.screenCaptureActive = _parseScreenCaptureState(call.arguments);
-        await _reevaluateBlockingState();
-        break;
-      default:
-        break;
-    }
-  }
+  bool get _shouldShieldOnInactive =>
+      defaultTargetPlatform == TargetPlatform.iOS;
 
-  void _handleRouteChanged() {
-    if (!_runtime.initialized || _runtime.isRouteRefreshScheduled) {
+  void _setInactivePrivacyShield({required bool active}) {
+    if (_runtime.inactivePrivacyShieldActive == active) {
       return;
     }
-    _runtime.isRouteRefreshScheduled = true;
-    scheduleMicrotask(() async {
-      _runtime.isRouteRefreshScheduled = false;
-      await _refreshRouteProtection();
-    });
+    _runtime.inactivePrivacyShieldActive = active;
+    _notifyListeners();
   }
 
-  Future<void> _handleAppResumed() async {
-    final DateTime? pausedAt = _runtime.pausedAt;
-    _runtime.pausedAt = null;
-    final String? routeName = navigatorObserver.currentRouteName;
-    if (pausedAt != null && routeName != null) {
-      final int elapsedSeconds = DateTime.now().difference(pausedAt).inSeconds;
-      if (routeName == _config.otpRouteName &&
-          elapsedSeconds > _config.otpBackgroundTimeoutSeconds) {
-        final NavigatorState? currentNavigator =
-            navigatorObserver.preferredNavigatorState;
-        if (currentNavigator != null && currentNavigator.canPop()) {
-          currentNavigator.pop();
-        }
-        await _refreshRouteProtection();
-        return;
-      }
-      if (_runtime.isAuthenticated &&
-          elapsedSeconds > _config.pinBackgroundTimeoutSeconds) {
-        _config.onLogoutRequested?.call();
-      }
-    }
-    await _refreshRouteProtection();
-  }
-
-  Future<void> _refreshRouteProtection() async {
-    final String? routeName = navigatorObserver.currentRouteName;
-    _runtime.isRouteSensitive =
-        routeName != null && _config.sensitiveRouteSet.contains(routeName);
-
-    await _setFlagSecure(_runtime.isRouteSensitive);
-    _syncOverlayMonitoring();
-
-    if (_runtime.isRouteSensitive) {
-      await _reevaluateBlockingState();
-    } else if (_runtime.hasPersistentBlockingSource) {
-      _clearBlockingOverlay();
-    }
-  }
-
-  void _syncOverlayMonitoring() {
-    _runtime.overlayMonitorTimer?.cancel();
-    if (!_config.enableOverlayDetection ||
-        !_runtime.isRouteSensitive ||
-        _runtime.emulatorBlocked) {
-      _runtime.overlayMonitorTimer = null;
-      return;
-    }
-    _runtime.overlayMonitorTimer = Timer.periodic(
-      const Duration(seconds: 1),
-      (_) => unawaited(_checkOverlayViolation()),
-    );
-  }
-
-  Future<void> _checkOverlayViolation() async {
-    if (!_runtime.isRouteSensitive) {
-      return;
-    }
-    final bool overlayDetected = await _safeIsOverlayPermissionDetected();
-    if (overlayDetected) {
-      _showBlockingOverlay(
-        messageId: FlutterDefenderMessageId.overlaysBlocked,
-        source: DefenderBlockingSource.overlay,
-      );
-      return;
-    }
-    if (_runtime.blockingSource == DefenderBlockingSource.overlay) {
-      await _reevaluateBlockingState();
-    }
-  }
-
-  Future<void> _reevaluateBlockingState() async {
-    if (_runtime.emulatorBlocked) {
-      _showBlockingOverlay(
-        messageId: FlutterDefenderMessageId.emulatorReleaseBlocked,
-        source: DefenderBlockingSource.emulator,
-      );
-      return;
-    }
-
-    if (!_runtime.isRouteSensitive) {
-      if (_runtime.hasPersistentBlockingSource) {
-        _clearBlockingOverlay();
-      }
-      return;
-    }
-
-    if (_config.enableOverlayDetection) {
-      final bool overlayDetected = await _safeIsOverlayPermissionDetected();
-      if (overlayDetected) {
-        _showBlockingOverlay(
-          messageId: FlutterDefenderMessageId.overlaysBlocked,
-          source: DefenderBlockingSource.overlay,
-        );
-        return;
-      }
-    }
-
-    _runtime.screenCaptureActive = await _safeIsScreenCaptured();
-    if (_runtime.screenCaptureActive) {
-      _showBlockingOverlay(
-        messageId: FlutterDefenderMessageId.screenCaptureBlocked,
-        source: DefenderBlockingSource.screenCapture,
-      );
-      return;
-    }
-
-    if (_config.enableForegroundCheck) {
-      final bool isForeground = await _safeIsAppInForeground();
-      if (!isForeground) {
-        _showBlockingOverlay(
-          messageId: FlutterDefenderMessageId.foregroundRequired,
-          source: DefenderBlockingSource.foreground,
-        );
-        return;
-      }
-    }
-
-    if (_runtime.hasPersistentBlockingSource) {
-      _clearBlockingOverlay();
-    }
-  }
-
-  void _showBlockingOverlay({
-    required FlutterDefenderMessageId messageId,
-    required DefenderBlockingSource source,
-  }) {
-    _runtime.temporaryBlockingTimer?.cancel();
-    _runtime.blockingSource = source;
-    _runtime.blockingMessageId.value = messageId;
-    _ensureBlockingOverlay();
-  }
-
-  void _showTemporaryBlockingOverlay({
-    required FlutterDefenderMessageId messageId,
-  }) {
-    if (_runtime.blockingSource != null &&
-        _runtime.blockingSource != DefenderBlockingSource.screenshot) {
-      return;
-    }
-    _runtime.blockingSource = DefenderBlockingSource.screenshot;
-    _runtime.blockingMessageId.value = messageId;
-    _ensureBlockingOverlay();
-    _runtime.temporaryBlockingTimer?.cancel();
-    _runtime.temporaryBlockingTimer = Timer(const Duration(seconds: 2), () {
-      if (_runtime.blockingSource == DefenderBlockingSource.screenshot) {
-        _clearBlockingOverlay();
-      }
-    });
-  }
-
-  void _ensureBlockingOverlay() {
-    if (_runtime.blockingEntry != null) {
-      return;
-    }
-    final NavigatorState? rootNavigator = navigatorObserver.rootNavigatorState;
-    final OverlayState? overlayState =
-        rootNavigator?.overlay ??
-        navigatorObserver.currentNavigatorState?.overlay;
-    if (overlayState == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_runtime.blockingSource != null) {
-          _ensureBlockingOverlay();
-        }
-      });
-      return;
-    }
-    _runtime.blockingEntry = OverlayEntry(
-      builder: (BuildContext overlayContext) {
-        return Positioned.fill(
-          child: _wrapBlockingLocalizationScope(
-            overlayContext,
-            ValueListenableBuilder<FlutterDefenderMessageId?>(
-              valueListenable: _runtime.blockingMessageId,
-              builder:
-                  (
-                    BuildContext context,
-                    FlutterDefenderMessageId? messageId,
-                    Widget? child,
-                  ) {
-                    if (messageId == null) {
-                      return const SizedBox.shrink();
-                    }
-                    return Builder(
-                      builder: (BuildContext innerContext) {
-                        final String message = _resolveBlockingMessage(
-                          innerContext,
-                          messageId,
-                        );
-                        final String? explicitTitle =
-                            _config.blockingTitleResolver != null
-                            ? _resolveBlockingTitle(innerContext)
-                            : null;
-                        return _config.blockingScreenBuilder?.call(message) ??
-                            BlockingScreen(
-                              title: explicitTitle,
-                              message: message,
-                              theme: _config.uiTheme,
-                            );
-                      },
-                    );
-                  },
-            ),
-          ),
-        );
-      },
-    );
-    overlayState.insert(_runtime.blockingEntry!);
-  }
-
-  Widget _wrapBlockingLocalizationScope(
-    BuildContext overlayContext,
-    Widget child,
-  ) {
-    final Locale? forced = _config.blockingLocale;
-    if (forced == null) {
-      return child;
-    }
-    return Localizations.override(
-      context: overlayContext,
-      locale: forced,
-      delegates: FlutterDefenderLocalizations.localizationsDelegates,
-      child: Directionality(
-        textDirection: flutterDefenderTextDirectionForLocale(forced),
-        child: child,
-      ),
-    );
-  }
-
-  String _resolveBlockingMessage(
-    BuildContext context,
-    FlutterDefenderMessageId messageId,
-  ) {
-    final String Function(BuildContext, FlutterDefenderMessageId)? resolver =
-        _config.messageResolver;
-    if (resolver != null) {
-      return resolver(context, messageId);
-    }
-    return FlutterDefenderMessages.resolved(context, messageId);
-  }
-
-  String _resolveBlockingTitle(BuildContext context) {
-    final String Function(BuildContext)? resolver =
-        _config.blockingTitleResolver;
-    if (resolver != null) {
-      return resolver(context);
-    }
-    return FlutterDefenderMessages.blockingTitleFor(context);
-  }
-
-  void _clearBlockingOverlay() {
-    if (_runtime.emulatorBlocked) {
-      return;
-    }
-    _runtime.temporaryBlockingTimer?.cancel();
-    _runtime.temporaryBlockingTimer = null;
-    _runtime.resetBlockingState();
-  }
-
-  Future<void> _setFlagSecure(bool enabled) async {
-    try {
-      await FlutterDefenderPlatform.instance.setFlagSecure(enabled);
-    } catch (_) {
-      // Native support is best-effort and should not crash the app.
-    }
-  }
-
-  Future<bool> _safeIsOverlayPermissionDetected() async {
-    try {
-      return await FlutterDefenderPlatform.instance
-          .isOverlayPermissionDetected();
-    } catch (_) {
-      return false;
-    }
-  }
-
-  Future<bool> _safeIsAppInForeground() async {
-    try {
-      return await FlutterDefenderPlatform.instance.isAppInForeground();
-    } catch (_) {
-      return true;
-    }
-  }
-
-  Future<bool> _safeIsEmulator() async {
-    try {
-      return await FlutterDefenderPlatform.instance.isEmulator();
-    } catch (_) {
-      return false;
-    }
-  }
-
-  Future<bool> _safeIsScreenCaptured() async {
-    try {
-      return await FlutterDefenderPlatform.instance.isScreenCaptured();
-    } catch (_) {
-      return false;
-    }
-  }
-
-  bool _parseScreenCaptureState(Object? arguments) {
-    return switch (arguments) {
-      final Map<Object?, Object?> map =>
-        map['active'] as bool? ?? _runtime.screenCaptureActive,
-      final bool value => value,
-      _ => _runtime.screenCaptureActive,
-    };
-  }
+  void _notifyListeners() => _notifier.emit();
 }

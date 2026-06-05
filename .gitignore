@@ -13,6 +13,7 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+codex/
 
 # IntelliJ / Android Studio
 *.iml

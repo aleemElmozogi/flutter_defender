@@ -140,6 +140,24 @@ abstract class FlutterDefenderLocalizations {
   /// In en, this message translates to:
   /// **'Security Policy: Sensitive screens require the app to remain in the foreground.'**
   String get foregroundRequired;
+
+  /// No description provided for @rootOrJailbreakBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Security Policy: This device security posture is not trusted (root/jailbreak detected).'**
+  String get rootOrJailbreakBlocked;
+
+  /// No description provided for @proxyOrVpnBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Security Policy: Proxy or VPN usage is not allowed for this protected screen.'**
+  String get proxyOrVpnBlocked;
+
+  /// No description provided for @tamperingBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Security Policy: Runtime tampering or debugging was detected.'**
+  String get tamperingBlocked;
 }
 
 class _FlutterDefenderLocalizationsDelegate

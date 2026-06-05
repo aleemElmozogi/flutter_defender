@@ -1,27 +1,96 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
+import 'package:flutter_defender/flutter_defender_platform_interface.dart';
+import 'package:flutter_defender/flutter_defender.dart';
+import 'package:flutter_defender/src/platform/pigeon/defender_messages.g.dart'
+    as pigeon;
+import 'package:flutter_defender/src/platform/pigeon_flutter_defender_platform.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'package:flutter_defender_example/main.dart';
 
-void main() {
-  testWidgets('Verify Platform version', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+class _FakeFlutterDefenderPlatform
+    with MockPlatformInterfaceMixin
+    implements FlutterDefenderPlatform {
+  @override
+  Future<void> clearLifecycleSnapshot() async {}
 
-    // Verify that platform version is retrieved.
-    expect(
-      find.byWidgetPredicate(
-        (Widget widget) => widget is Text &&
-                           widget.data!.startsWith('Running on:'),
-      ),
-      findsOneWidget,
-    );
+  @override
+  Future<pigeon.AdvancedSecuritySignals> getAdvancedSecuritySignals() async =>
+      pigeon.AdvancedSecuritySignals(
+        rootedOrJailbroken: false,
+        proxyEnabled: false,
+        vpnEnabled: false,
+        debuggerAttached: false,
+        tamperingDetected: false,
+        tamperingDetails: null,
+      );
+
+  @override
+  Future<pigeon.NativeRuntimeState> getRuntimeState() async =>
+      pigeon.NativeRuntimeState(
+        isForeground: true,
+        isScreenCaptured: false,
+        isEmulator: false,
+        supportsOverlayHardening: true,
+      );
+
+  @override
+  Future<pigeon.LifecycleSnapshot> loadLifecycleSnapshot() async =>
+      pigeon.LifecycleSnapshot(
+        lastBackgroundedAtMs: null,
+        wasAuthenticated: false,
+        activeGuardKind: pigeon.DefenderGuardKind.none,
+      );
+
+  @override
+  Future<void> saveLifecycleSnapshot(pigeon.LifecycleSnapshot snapshot) async {}
+
+  @override
+  Future<void> secureClearAll() async {}
+
+  @override
+  Future<void> secureDelete(String key) async {}
+
+  @override
+  Future<String?> secureRead(String key) async => null;
+
+  @override
+  Future<void> secureWrite({
+    required String key,
+    required String value,
+  }) async {}
+
+  @override
+  Future<void> setProtectionState({
+    required bool secureActive,
+    required bool overlayHardeningActive,
+  }) async {}
+
+  @override
+  void setCallbacks(FlutterDefenderPlatformCallbacks? callbacks) {}
+}
+
+void main() {
+  tearDown(() {
+    FlutterDefender.instance.dispose();
+    FlutterDefenderPlatform.instance = PigeonFlutterDefenderPlatform();
+  });
+
+  testWidgets('example home renders guarded actions', (
+    WidgetTester tester,
+  ) async {
+    FlutterDefenderPlatform.instance = _FakeFlutterDefenderPlatform();
+    final SessionController sessionController = SessionController();
+    sessionController.registerLogoutHandler(() {
+      sessionController.handleTimeoutLogout();
+    });
+    await sessionController.applyProfile(sessionController.activeProfile);
+
+    await tester.pumpWidget(MyApp(sessionController: sessionController));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.text('Feature Lab'), findsOneWidget);
+    expect(find.text('Configuration Profiles'), findsOneWidget);
+    expect(find.text('Session'), findsWidgets);
   });
 }

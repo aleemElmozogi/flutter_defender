@@ -30,4 +30,16 @@ class FlutterDefenderLocalizationsEs extends FlutterDefenderLocalizations {
   @override
   String get foregroundRequired =>
       'Política de seguridad: las pantallas sensibles requieren que la aplicación permanezca en primer plano.';
+
+  @override
+  String get rootOrJailbreakBlocked =>
+      'Política de seguridad: no se confía en el estado del dispositivo (se detectó root/jailbreak).';
+
+  @override
+  String get proxyOrVpnBlocked =>
+      'Política de seguridad: no se permite usar proxy o VPN en esta pantalla protegida.';
+
+  @override
+  String get tamperingBlocked =>
+      'Política de seguridad: se detectó manipulación en tiempo de ejecución o depuración.';
 }

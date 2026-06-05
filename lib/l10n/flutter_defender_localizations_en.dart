@@ -30,4 +30,16 @@ class FlutterDefenderLocalizationsEn extends FlutterDefenderLocalizations {
   @override
   String get foregroundRequired =>
       'Security Policy: Sensitive screens require the app to remain in the foreground.';
+
+  @override
+  String get rootOrJailbreakBlocked =>
+      'Security Policy: This device security posture is not trusted (root/jailbreak detected).';
+
+  @override
+  String get proxyOrVpnBlocked =>
+      'Security Policy: Proxy or VPN usage is not allowed for this protected screen.';
+
+  @override
+  String get tamperingBlocked =>
+      'Security Policy: Runtime tampering or debugging was detected.';
 }
