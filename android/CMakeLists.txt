@@ -18,3 +18,6 @@ target_compile_options(flutter_defender PRIVATE
     -Wall
     -Wextra
     -Wno-unused-parameter)
+
+target_link_options(flutter_defender PRIVATE
+    "-Wl,-z,max-page-size=16384")

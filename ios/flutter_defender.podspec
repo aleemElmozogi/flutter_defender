@@ -4,7 +4,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'flutter_defender'
-  s.version          = '0.4.0'
+  s.version          = '0.5.0'
   s.summary          = 'Secure-screen protection for Flutter apps.'
   s.description      = <<-DESC
 Secure-screen protection for Flutter apps.

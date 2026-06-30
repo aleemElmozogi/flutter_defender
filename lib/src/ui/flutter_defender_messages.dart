@@ -18,6 +18,8 @@ final class FlutterDefenderMessages {
       'Security Policy: Screen overlays are not allowed while sensitive content is visible.';
   static const String screenCaptureBlocked =
       'Security Policy: Screen recording or mirroring is not allowed.';
+  static const String protectedContentHidden =
+      'Security Policy: Sensitive content is hidden while protection is active.';
   static const String foregroundRequired =
       'Security Policy: Sensitive screens require the app to remain in the foreground.';
   static const String rootOrJailbreakBlocked =
@@ -33,6 +35,7 @@ final class FlutterDefenderMessages {
       FlutterDefenderMessageId.screenshotsBlocked => screenshotsBlocked,
       FlutterDefenderMessageId.overlaysBlocked => overlaysBlocked,
       FlutterDefenderMessageId.screenCaptureBlocked => screenCaptureBlocked,
+      FlutterDefenderMessageId.protectedContentHidden => protectedContentHidden,
       FlutterDefenderMessageId.foregroundRequired => foregroundRequired,
       FlutterDefenderMessageId.rootOrJailbreakBlocked => rootOrJailbreakBlocked,
       FlutterDefenderMessageId.proxyOrVpnBlocked => proxyOrVpnBlocked,
@@ -57,6 +60,8 @@ final class FlutterDefenderMessages {
         FlutterDefenderMessageId.overlaysBlocked => loc.overlaysBlocked,
         FlutterDefenderMessageId.screenCaptureBlocked =>
           loc.screenCaptureBlocked,
+        FlutterDefenderMessageId.protectedContentHidden =>
+          loc.protectedContentHidden,
         FlutterDefenderMessageId.foregroundRequired => loc.foregroundRequired,
         FlutterDefenderMessageId.rootOrJailbreakBlocked =>
           loc.rootOrJailbreakBlocked,

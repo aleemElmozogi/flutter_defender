@@ -242,6 +242,10 @@ void main() {
       await tester.pump();
 
       expect(defender.shouldConcealGuardedContent, isTrue);
+      expect(
+        find.text(FlutterDefenderMessages.protectedContentHidden),
+        findsOneWidget,
+      );
 
       defender.didChangeAppLifecycleState(AppLifecycleState.resumed);
       await tester.pump();
@@ -250,6 +254,66 @@ void main() {
     },
     variant: TargetPlatformVariant.only(TargetPlatform.iOS),
   );
+
+  testWidgets('secure content guard conceals only its own subtree', (
+    WidgetTester tester,
+  ) async {
+    var outsideTaps = 0;
+    var insideTaps = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Column(
+            children: <Widget>[
+              ElevatedButton(
+                onPressed: () {
+                  outsideTaps += 1;
+                },
+                child: const Text('outside action'),
+              ),
+              SizedBox(
+                width: 280,
+                height: 180,
+                child: FlutterDefenderSecureContentGuard(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      insideTaps += 1;
+                    },
+                    child: const Text('inside secret'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    fakePlatform.emitScreenCaptureChanged(true);
+    await tester.pump();
+
+    expect(
+      find.text(FlutterDefenderMessages.protectedContentHidden),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        FlutterDefenderMessages.stringFor(
+          FlutterDefenderMessageId.screenCaptureBlocked,
+        ),
+      ),
+      findsNothing,
+    );
+
+    await tester.tap(find.text('outside action'));
+    await tester.tap(find.text('inside secret'), warnIfMissed: false);
+    await tester.pump();
+
+    expect(outsideTaps, 1);
+    expect(insideTaps, 0);
+  });
 
   testWidgets('secure storage helper is fail-fast on platform errors', (
     WidgetTester tester,

@@ -27,6 +27,10 @@ class FlutterDefenderLocalizationsAr extends FlutterDefenderLocalizations {
       'يرجى إيقاف تسجيل الشاشة أو ميزة العرض اللاسلكي.';
 
   @override
+  String get protectedContentHidden =>
+      'تم إخفاء المحتوى الحساس أثناء تفعيل الحماية.';
+
+  @override
   String get foregroundRequired =>
       'يجب عدم مغادرة هذه الشاشة حتى اكتمال العملية.';
 

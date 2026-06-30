@@ -135,6 +135,12 @@ abstract class FlutterDefenderLocalizations {
   /// **'Security Policy: Screen recording or mirroring is not allowed.'**
   String get screenCaptureBlocked;
 
+  /// No description provided for @protectedContentHidden.
+  ///
+  /// In en, this message translates to:
+  /// **'Security Policy: Sensitive content is hidden while protection is active.'**
+  String get protectedContentHidden;
+
   /// No description provided for @foregroundRequired.
   ///
   /// In en, this message translates to:

@@ -217,6 +217,8 @@ String _resolveBlockingMessage(
       'Resolver demo: another app is drawing over this sensitive screen.',
     FlutterDefenderMessageId.screenCaptureBlocked =>
       'Resolver demo: screen recording or mirroring is blocked here.',
+    FlutterDefenderMessageId.protectedContentHidden =>
+      'Resolver demo: protected content is hidden while policy checks are active.',
     FlutterDefenderMessageId.foregroundRequired =>
       'Resolver demo: this protected route must stay in the foreground.',
     FlutterDefenderMessageId.rootOrJailbreakBlocked =>

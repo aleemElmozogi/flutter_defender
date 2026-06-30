@@ -274,6 +274,135 @@ private final class IosSecureStorageHelper {
   }
 }
 
+private final class IosSecureSurfaceTextField: UITextField {
+  weak var forwardedView: UIView?
+
+  override var canBecomeFirstResponder: Bool {
+    false
+  }
+
+  override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+    guard let forwardedView else {
+      return nil
+    }
+    let forwardedPoint = forwardedView.convert(point, from: self)
+    return forwardedView.hitTest(forwardedPoint, with: event)
+  }
+}
+
+private final class IosSecureSurfaceController {
+  private let viewProvider: () -> UIView?
+  private var secureTextField: IosSecureSurfaceTextField?
+  private weak var securedView: UIView?
+  private weak var originalSuperview: UIView?
+  private var originalIndex = 0
+  private var originalFrame = CGRect.zero
+  private var originalAutoresizingMask: UIView.AutoresizingMask = []
+  private var originalTranslatesAutoresizingMaskIntoConstraints = true
+
+  init(viewProvider: @escaping () -> UIView? = IosSecureSurfaceController.defaultFlutterRootView) {
+    self.viewProvider = viewProvider
+  }
+
+  func setEnabled(_ enabled: Bool) {
+    if Thread.isMainThread {
+      enabled ? enable() : disable()
+      return
+    }
+    DispatchQueue.main.async { [weak self] in
+      self?.setEnabled(enabled)
+    }
+  }
+
+  private func enable() {
+    guard secureTextField == nil,
+          let view = viewProvider(),
+          let superview = view.superview
+    else {
+      return
+    }
+
+    let originalIndex = superview.subviews.firstIndex(of: view) ?? superview.subviews.count
+    let secureTextField = IosSecureSurfaceTextField(frame: view.frame)
+    secureTextField.isSecureTextEntry = true
+    secureTextField.borderStyle = .none
+    secureTextField.backgroundColor = .clear
+    secureTextField.textColor = .clear
+    secureTextField.tintColor = .clear
+    secureTextField.autocorrectionType = .no
+    secureTextField.spellCheckingType = .no
+    secureTextField.autocapitalizationType = .none
+    secureTextField.translatesAutoresizingMaskIntoConstraints = view.translatesAutoresizingMaskIntoConstraints
+    secureTextField.autoresizingMask = view.autoresizingMask
+
+    superview.insertSubview(secureTextField, at: originalIndex)
+    secureTextField.layoutIfNeeded()
+
+    guard let secureContainer = secureContainerView(in: secureTextField) else {
+      secureTextField.removeFromSuperview()
+      return
+    }
+
+    self.secureTextField = secureTextField
+    self.securedView = view
+    self.originalSuperview = superview
+    self.originalIndex = originalIndex
+    self.originalFrame = view.frame
+    self.originalAutoresizingMask = view.autoresizingMask
+    self.originalTranslatesAutoresizingMaskIntoConstraints = view.translatesAutoresizingMaskIntoConstraints
+
+    view.removeFromSuperview()
+    view.translatesAutoresizingMaskIntoConstraints = true
+    view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    view.frame = secureContainer.bounds
+    secureContainer.clipsToBounds = true
+    secureContainer.addSubview(view)
+    secureTextField.forwardedView = view
+  }
+
+  private func disable() {
+    guard let secureTextField,
+          let securedView,
+          let originalSuperview
+    else {
+      return
+    }
+
+    securedView.removeFromSuperview()
+    securedView.translatesAutoresizingMaskIntoConstraints = originalTranslatesAutoresizingMaskIntoConstraints
+    securedView.autoresizingMask = originalAutoresizingMask
+    securedView.frame = originalFrame
+    let restoredIndex = min(originalIndex, originalSuperview.subviews.count)
+    originalSuperview.insertSubview(securedView, at: restoredIndex)
+    secureTextField.forwardedView = nil
+    secureTextField.removeFromSuperview()
+
+    self.secureTextField = nil
+    self.securedView = nil
+    self.originalSuperview = nil
+  }
+
+  private func secureContainerView(in textField: UITextField) -> UIView? {
+    textField.layoutIfNeeded()
+    return textField.subviews.first { subview in
+      let className = String(describing: type(of: subview))
+      return className.contains("Canvas") || className.contains("Content")
+    } ?? textField.subviews.first
+  }
+
+  private static func defaultFlutterRootView() -> UIView? {
+    if #available(iOS 13.0, *) {
+      let windows = UIApplication.shared.connectedScenes
+        .compactMap { $0 as? UIWindowScene }
+        .flatMap { $0.windows }
+      let window = windows.first { $0.isKeyWindow } ?? windows.first
+      return window?.rootViewController?.view ?? window?.subviews.first
+    }
+    let window = UIApplication.shared.keyWindow ?? UIApplication.shared.windows.first
+    return window?.rootViewController?.view ?? window?.subviews.first
+  }
+}
+
 public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostApi {
   private let notificationCenter: NotificationCenter
   private let appStateProvider: FlutterDefenderAppStateProvider
@@ -283,6 +412,7 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
   private let flutterApi: DefenderFlutterApiProtocol
   private let securityDetector: IosAdvancedSecurityDetector
   private let secureStorageHelper: IosSecureStorageHelper
+  private let secureSurfaceController: IosSecureSurfaceController
   private let detectorQueue = DispatchQueue(
     label: "flutter_defender.security.detector",
     qos: .utility
@@ -332,6 +462,7 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
     self.flutterApi = DefenderFlutterApi(binaryMessenger: binaryMessenger)
     self.securityDetector = IosAdvancedSecurityDetector()
     self.secureStorageHelper = IosSecureStorageHelper()
+    self.secureSurfaceController = IosSecureSurfaceController()
     super.init()
     startObservers()
     scheduleSecurityRefresh()
@@ -343,6 +474,7 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
   }
 
   deinit {
+    secureSurfaceController.setEnabled(false)
     if let screenshotObserver {
       notificationCenter.removeObserver(screenshotObserver)
     }
@@ -364,6 +496,7 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
   }
 
   func setProtectionState(secureActive: Bool, overlayHardeningActive: Bool) throws {
+    secureSurfaceController.setEnabled(secureActive)
     if secureActive || overlayHardeningActive {
       scheduleSecurityRefresh()
     }

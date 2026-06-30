@@ -15,6 +15,7 @@ data (finance, healthcare, enterprise, identity, and more). Guarded screens can:
 
 This package uses **explicit guard widgets**:
 - `FlutterDefenderSensitiveGuard`
+- `FlutterDefenderSecureContentGuard`
 - `FlutterDefenderOtpGuard`
 
 There is no route-observer setup. A guarded screen protects itself before the sensitive child is revealed.
@@ -23,7 +24,7 @@ There is no route-observer setup. A guarded screen protects itself before the se
 
 ```yaml
 dependencies:
-  flutter_defender: ^0.4.0
+  flutter_defender: ^0.5.0
 ```
 
 ### Android release emulator launch block
@@ -135,6 +136,38 @@ class OtpPage extends StatelessWidget {
   }
 }
 ```
+
+Wrap smaller sensitive regions when the rest of the screen should stay visible
+and usable while the protected region is concealed:
+
+```dart
+class AccountSummaryCard extends StatelessWidget {
+  const AccountSummaryCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const FlutterDefenderSecureContentGuard(
+      child: BalanceCard(),
+    );
+  }
+}
+```
+
+`FlutterDefenderSensitiveGuard` uses a full-screen blocking overlay for active
+policy violations. When guarded content must be hidden before an explicit
+blocking reason is available, it shows a default concealment placeholder styled
+with `FlutterDefenderUiTheme`. `FlutterDefenderSecureContentGuard` uses the
+same protection registration, but replaces only its own child bounds with the
+themed placeholder and does not draw a route-level blocking screen.
+
+On Android, activating any guard enables `FLAG_SECURE` on the activity window.
+On iOS, activating any guard enables the native secure surface for the Flutter
+root view. The scoped content guard controls the visible Dart replacement area,
+but native screenshot protection applies to the Android window or shared iOS
+Flutter surface rather than an individual Dart widget subtree.
+
+Both guards accept `placeholderBuilder` if the host app wants custom replacement
+content.
 
 ## API
 
@@ -267,7 +300,7 @@ await FlutterDefender.instance.init(
 
 | Capability | Android | iOS |
 | --- | --- | --- |
-| Secure screenshots / recents | Yes, via `FLAG_SECURE` | No direct equivalent |
+| Secure screenshots / recents | Yes, via window-level `FLAG_SECURE` | Secure text-entry backed surface for guarded content |
 | Screenshot event | Android 14+ screenshot callback | Post-capture notification only |
 | Live capture / mirroring detection | Limited | Yes, across connected screens via `UIScreen.isCaptured` |
 | Conceal on focus loss (`inactive`) | Lifecycle-driven concealment | Yes, hides guarded content immediately |
@@ -280,7 +313,9 @@ await FlutterDefender.instance.init(
 
 Important limitations:
 - **Android overlay defense is mitigation-based.** The plugin hardens guarded screens and reports obscured-touch violations; it does not claim perfect detection of every hostile overlay.
+- **Android secure screenshot protection is window-level.** `FLAG_SECURE` protects the activity window while a guard is active; it cannot be limited to one Dart widget subtree.
 - **iOS screenshot detection is after capture.** The system screenshot has already happened when the notification arrives.
+- **iOS guarded content uses a secure text-entry backed surface.** This is the closest practical equivalent to Telegram-style screenshot blanking, but it relies on iOS secure-rendering behavior and should be validated on real devices for each supported iOS release. Because Flutter renders through a shared native surface, native secure wrapping is applied to the Flutter root view while a guard is active.
 - **iOS uses privacy concealment, not hostile-overlay detection.** Guarded content is hidden when the app becomes inactive, such as during Control Center, Notification Center, Siri, calls, or app-switcher transitions.
 - **Release-only emulator/simulator blocking** applies on guarded screens when `enableEmulatorDetectionRelease` is enabled. On Android, the optional package launcher guard blocks release-like emulator launches before Flutter starts. On iOS, `flutter build ios --simulator --release` is already rejected by Flutter/Xcode tooling.
 
@@ -348,7 +383,7 @@ This repository includes GitHub Actions for CI and publishing:
 - Pull requests run package and example analysis plus tests.
 - Pushes to `main` / `master` rerun those checks, verify that `pubspec.yaml`
   contains a version higher than the previous branch tip, and then create a
-  matching Git tag such as `v0.4.0`.
+  matching Git tag such as `v0.5.0`.
 - Pushing that tag triggers the publish workflow, which runs a final
   `flutter pub publish --dry-run` and then publishes to pub.dev.
 

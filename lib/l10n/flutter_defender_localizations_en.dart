@@ -28,6 +28,10 @@ class FlutterDefenderLocalizationsEn extends FlutterDefenderLocalizations {
       'Security Policy: Screen recording or mirroring is not allowed.';
 
   @override
+  String get protectedContentHidden =>
+      'Security Policy: Sensitive content is hidden while protection is active.';
+
+  @override
   String get foregroundRequired =>
       'Security Policy: Sensitive screens require the app to remain in the foreground.';
 

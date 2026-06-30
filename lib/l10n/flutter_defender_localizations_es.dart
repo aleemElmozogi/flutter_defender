@@ -28,6 +28,10 @@ class FlutterDefenderLocalizationsEs extends FlutterDefenderLocalizations {
       'Política de seguridad: no se permite la grabación o duplicación de pantalla.';
 
   @override
+  String get protectedContentHidden =>
+      'Política de seguridad: el contenido sensible está oculto mientras la protección está activa.';
+
+  @override
   String get foregroundRequired =>
       'Política de seguridad: las pantallas sensibles requieren que la aplicación permanezca en primer plano.';
 
