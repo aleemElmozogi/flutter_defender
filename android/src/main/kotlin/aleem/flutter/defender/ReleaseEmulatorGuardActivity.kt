@@ -51,7 +51,14 @@ class ReleaseEmulatorGuardActivity : Activity() {
         val targetActivity = targetActivityName()
         try {
             Log.d(TAG, "Forwarding launcher to $targetActivity.")
-            startActivity(Intent().setClassName(packageName, targetActivity))
+            val targetIntent = Intent()
+                .setClassName(packageName, targetActivity)
+                .addFlags(
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                        Intent.FLAG_ACTIVITY_NO_ANIMATION
+                )
+            startActivity(targetIntent)
             finish()
             overridePendingTransition(0, 0)
         } catch (error: ActivityNotFoundException) {

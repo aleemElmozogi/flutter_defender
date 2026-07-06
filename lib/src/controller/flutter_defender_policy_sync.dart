@@ -20,7 +20,7 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
       if (_currentGuardKind == pigeon.DefenderGuardKind.otp &&
           elapsedSeconds >= _config.otpBackgroundTimeoutSeconds) {
         _popLatestOtpGuard();
-        await _syncProtection();
+        await _syncProtection(concealUntilProtectionReady: false);
         return;
       }
       if (_runtime.isAuthenticated &&
@@ -32,7 +32,7 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
     }
 
     _runtime.overlayViolationActive = false;
-    await _syncProtection();
+    await _syncProtection(concealUntilProtectionReady: false);
   }
 
   Future<void> _applyColdStartSnapshot(
@@ -79,16 +79,47 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
     );
   }
 
-  Future<void> _syncProtection() async {
+  Future<void> _syncProtection({
+    bool concealUntilProtectionReady = true,
+  }) async {
     final int generation = ++_syncGeneration;
-    _runtime.protectionReady = false;
-    _notifyListeners();
-
     final bool hasGuards = _activeGuards.isNotEmpty;
+    if (!hasGuards) {
+      if (_runtime.nativeProtectionActive) {
+        await _safeSetProtectionState(
+          secureActive: false,
+          overlayHardeningActive: false,
+        );
+        if (generation != _syncGeneration) {
+          return;
+        }
+        _runtime.nativeProtectionActive = false;
+      }
+      _runtime
+        ..rootBlocked = false
+        ..proxyOrVpnBlocked = false
+        ..tamperingBlocked = false;
+      _clearBlockingState();
+      _runtime.protectionReady = true;
+      _notifyListeners();
+      return;
+    }
+
+    final bool needsProtectionWarmup =
+        concealUntilProtectionReady && !_runtime.nativeProtectionActive;
+    if (needsProtectionWarmup) {
+      _runtime.protectionReady = false;
+      _notifyListeners();
+    }
+
     await _safeSetProtectionState(
       secureActive: hasGuards,
       overlayHardeningActive: hasGuards,
     );
+    if (generation != _syncGeneration) {
+      return;
+    }
+    _runtime.nativeProtectionActive = hasGuards;
 
     final pigeon.NativeRuntimeState runtimeState = await _safeGetRuntimeState();
     if (generation != _syncGeneration) {
@@ -110,13 +141,6 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
         ..rootBlocked = false
         ..proxyOrVpnBlocked = false
         ..tamperingBlocked = false;
-    }
-
-    if (!hasGuards) {
-      _clearBlockingState();
-      _runtime.protectionReady = true;
-      _notifyListeners();
-      return;
     }
 
     _recomputeBlockingState();

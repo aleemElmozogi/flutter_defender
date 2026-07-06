@@ -3,6 +3,9 @@
   <application>
     <activity
       android:name=".ReleaseEmulatorGuardActivity"
-      android:exported="false" />
+      android:excludeFromRecents="true"
+      android:exported="false"
+      android:finishOnTaskLaunch="true"
+      android:noHistory="true" />
   </application>
 </manifest>

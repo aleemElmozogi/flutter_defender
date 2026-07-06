@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_defender/flutter_defender.dart';
 import 'package:flutter_defender/flutter_defender_platform_interface.dart';
@@ -43,6 +45,7 @@ class FakeFlutterDefenderPlatform
   bool throwOnSecureRead = false;
   bool throwOnSecureDelete = false;
   bool throwOnSecureClearAll = false;
+  Completer<pigeon.NativeRuntimeState>? getRuntimeStateCompleter;
   Duration loadLifecycleSnapshotDelay = Duration.zero;
   int secureClearAllCallCount = 0;
 
@@ -59,6 +62,11 @@ class FakeFlutterDefenderPlatform
   Future<pigeon.NativeRuntimeState> getRuntimeState() async {
     if (throwOnGetRuntimeState) {
       throw PlatformException(code: 'runtime_state_failure');
+    }
+    final Completer<pigeon.NativeRuntimeState>? completer =
+        getRuntimeStateCompleter;
+    if (completer != null) {
+      return completer.future;
     }
     return runtimeState;
   }
@@ -168,6 +176,7 @@ void main() {
     'init wires native callbacks and pause persists lifecycle state',
     (WidgetTester tester) async {
       expect(fakePlatform.callbacks, isNotNull);
+      expect(fakePlatform.protectionCalls, isEmpty);
 
       defender.setAuthenticated(true);
       defender.didChangeAppLifecycleState(AppLifecycleState.paused);
@@ -251,6 +260,32 @@ void main() {
       await tester.pump();
 
       expect(defender.shouldConcealGuardedContent, isFalse);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
+
+  testWidgets(
+    'resume clears inactive shield while native refresh is pending',
+    (WidgetTester tester) async {
+      expect(defender.shouldConcealGuardedContent, isFalse);
+
+      defender.didChangeAppLifecycleState(AppLifecycleState.inactive);
+      await tester.pump();
+
+      expect(defender.shouldConcealGuardedContent, isTrue);
+
+      fakePlatform.getRuntimeStateCompleter =
+          Completer<pigeon.NativeRuntimeState>();
+      defender.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await tester.pump();
+
+      expect(defender.shouldConcealGuardedContent, isFalse);
+
+      fakePlatform.getRuntimeStateCompleter!.complete(
+        fakePlatform.runtimeState,
+      );
+      fakePlatform.getRuntimeStateCompleter = null;
+      await tester.pumpAndSettle();
     },
     variant: TargetPlatformVariant.only(TargetPlatform.iOS),
   );

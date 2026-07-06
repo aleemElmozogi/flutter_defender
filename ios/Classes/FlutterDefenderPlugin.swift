@@ -306,11 +306,34 @@ private final class IosSecureSurfaceController {
 
   func setEnabled(_ enabled: Bool) {
     if Thread.isMainThread {
-      enabled ? enable() : disable()
+      enabled ? enableOrRefresh() : disable()
       return
     }
     DispatchQueue.main.async { [weak self] in
       self?.setEnabled(enabled)
+    }
+  }
+
+  func refreshIfEnabled() {
+    if Thread.isMainThread {
+      if secureTextField != nil {
+        enableOrRefresh()
+      }
+      return
+    }
+    DispatchQueue.main.async { [weak self] in
+      self?.refreshIfEnabled()
+    }
+  }
+
+  private func enableOrRefresh() {
+    if secureTextField == nil {
+      enable()
+      return
+    }
+    if !refreshEnabledSurface() {
+      disable()
+      enable()
     }
   }
 
@@ -358,28 +381,53 @@ private final class IosSecureSurfaceController {
     secureContainer.clipsToBounds = true
     secureContainer.addSubview(view)
     secureTextField.forwardedView = view
+    _ = refreshEnabledSurface()
   }
 
   private func disable() {
-    guard let secureTextField,
-          let securedView,
-          let originalSuperview
-    else {
+    guard let secureTextField else {
       return
     }
 
-    securedView.removeFromSuperview()
-    securedView.translatesAutoresizingMaskIntoConstraints = originalTranslatesAutoresizingMaskIntoConstraints
-    securedView.autoresizingMask = originalAutoresizingMask
-    securedView.frame = originalFrame
-    let restoredIndex = min(originalIndex, originalSuperview.subviews.count)
-    originalSuperview.insertSubview(securedView, at: restoredIndex)
+    if let securedView {
+      securedView.removeFromSuperview()
+      securedView.translatesAutoresizingMaskIntoConstraints = originalTranslatesAutoresizingMaskIntoConstraints
+      securedView.autoresizingMask = originalAutoresizingMask
+      securedView.frame = originalFrame
+      if let originalSuperview {
+        let restoredIndex = min(originalIndex, originalSuperview.subviews.count)
+        originalSuperview.insertSubview(securedView, at: restoredIndex)
+      }
+    }
     secureTextField.forwardedView = nil
     secureTextField.removeFromSuperview()
 
     self.secureTextField = nil
     self.securedView = nil
     self.originalSuperview = nil
+  }
+
+  private func refreshEnabledSurface() -> Bool {
+    guard let secureTextField,
+          let securedView,
+          let originalSuperview,
+          secureTextField.superview != nil,
+          let secureContainer = secureContainerView(in: secureTextField)
+    else {
+      return false
+    }
+
+    secureTextField.frame = originalSuperview.bounds
+    secureContainer.clipsToBounds = true
+    if securedView.superview !== secureContainer {
+      securedView.removeFromSuperview()
+      secureContainer.addSubview(securedView)
+    }
+    securedView.translatesAutoresizingMaskIntoConstraints = true
+    securedView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    securedView.frame = secureContainer.bounds
+    secureTextField.forwardedView = securedView
+    return true
   }
 
   private func secureContainerView(in textField: UITextField) -> UIView? {
@@ -600,6 +648,7 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
       object: nil,
       queue: .main
     ) { [weak self] _ in
+      self?.secureSurfaceController.refreshIfEnabled()
       self?.scheduleSecurityRefresh()
       self?.flutterApi.onForegroundStateChanged(active: true) { _ in }
     }

@@ -37,8 +37,11 @@ it at your real Flutter activity:
 ```xml
 <activity
     android:name="aleem.flutter.defender.ReleaseEmulatorGuardActivity"
+    android:excludeFromRecents="true"
     android:exported="true"
+    android:finishOnTaskLaunch="true"
     android:launchMode="singleTask"
+    android:noHistory="true"
     android:taskAffinity=""
     android:theme="@style/LaunchTheme"
     tools:replace="android:exported">
