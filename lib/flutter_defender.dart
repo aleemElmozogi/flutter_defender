@@ -163,9 +163,8 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
       enableForegroundCheck: enableForegroundCheck,
       enableEmulatorDetectionRelease: enableEmulatorDetectionRelease,
       enableRootDetection: enableRootDetection ?? releaseEnabledByDefault,
-      enableProxyVpnDetection:
-          enableProxyVpnDetection ?? releaseEnabledByDefault,
-      enableRaspDetection: enableRaspDetection ?? releaseEnabledByDefault,
+      enableProxyVpnDetection: enableProxyVpnDetection ?? false,
+      enableRaspDetection: enableRaspDetection ?? false,
       enableSecureStorageHelper: enableSecureStorageHelper,
       clearSecureStorageOnLogout: clearSecureStorageOnLogout,
       blockingScreenBuilder: blockingScreenBuilder,

@@ -182,8 +182,8 @@ Options:
 - `enableForegroundCheck`
 - `enableEmulatorDetectionRelease`
 - `enableRootDetection` (defaults to `true` in release, `false` in debug/profile)
-- `enableProxyVpnDetection` (defaults to `true` in release, `false` in debug/profile)
-- `enableRaspDetection` (defaults to `true` in release, `false` in debug/profile)
+- `enableProxyVpnDetection` (default `false`)
+- `enableRaspDetection` (default `false`)
 - `enableSecureStorageHelper` (default `false`)
 - `clearSecureStorageOnLogout` (default `false`)
 - `onLogoutRequested`
@@ -210,6 +210,8 @@ All advanced layers are optional and configured at `init`.
 ### Proxy / VPN Detection
 
 - Detects active proxy settings and VPN transport/interface indicators.
+- Disabled by default in every build mode; enable it explicitly when the host
+  app wants proxy/VPN usage to block guarded content.
 - Callback: `onProxyOrVpnDetected`
 - Policy toggle: `enableProxyVpnDetection`
 
@@ -217,6 +219,13 @@ All advanced layers are optional and configured at `init`.
 
 - Uses a native C++ FFI core for debugger, root/jailbreak, emulator, and
   common hooking-artifact signals, merged with the platform detector fallback.
+- Disabled by default in every build mode; enable it explicitly when the host
+  app wants debugger or tampering signals to block guarded content.
+- Debugger attachment is treated as tampering. If `enableRaspDetection` is
+  forced on while running from Flutter tooling, Xcode, or Android Studio with a
+  debugger attached, guarded content is expected to be blocked even on a clean
+  device. Validate this policy in an unattached release/profile build when you
+  need production-like behavior.
 - Callback: `onTamperingDetected`
 - Policy toggle: `enableRaspDetection`
 

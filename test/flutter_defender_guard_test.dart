@@ -350,6 +350,117 @@ void main() {
     expect(insideTaps, 0);
   });
 
+  testWidgets('proxy vpn and rasp signals do not block by default', (
+    WidgetTester tester,
+  ) async {
+    fakePlatform.advancedSecuritySignals = pigeon.AdvancedSecuritySignals(
+      rootedOrJailbroken: false,
+      proxyEnabled: true,
+      vpnEnabled: true,
+      debuggerAttached: true,
+      tamperingDetected: true,
+      tamperingDetails: 'debugger,hooking',
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secure')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(defender.shouldConcealGuardedContent, isFalse);
+    expect(find.text('secure'), findsOneWidget);
+    expect(
+      find.text(
+        FlutterDefenderMessages.stringFor(
+          FlutterDefenderMessageId.proxyOrVpnBlocked,
+        ),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.text(
+        FlutterDefenderMessages.stringFor(
+          FlutterDefenderMessageId.tamperingBlocked,
+        ),
+      ),
+      findsNothing,
+    );
+  });
+
+  testWidgets('explicit proxy vpn detection blocks guarded content', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init(enableProxyVpnDetection: true);
+    fakePlatform.advancedSecuritySignals = pigeon.AdvancedSecuritySignals(
+      rootedOrJailbroken: false,
+      proxyEnabled: false,
+      vpnEnabled: true,
+      debuggerAttached: false,
+      tamperingDetected: false,
+      tamperingDetails: null,
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secure')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(defender.shouldConcealGuardedContent, isTrue);
+    expect(
+      find.text(
+        FlutterDefenderMessages.stringFor(
+          FlutterDefenderMessageId.proxyOrVpnBlocked,
+        ),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('explicit rasp detection blocks debugger tampering signals', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init(enableRaspDetection: true);
+    fakePlatform.advancedSecuritySignals = pigeon.AdvancedSecuritySignals(
+      rootedOrJailbroken: false,
+      proxyEnabled: false,
+      vpnEnabled: false,
+      debuggerAttached: true,
+      tamperingDetected: false,
+      tamperingDetails: 'debugger',
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secure')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(defender.shouldConcealGuardedContent, isTrue);
+    expect(
+      find.text(
+        FlutterDefenderMessages.stringFor(
+          FlutterDefenderMessageId.tamperingBlocked,
+        ),
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('secure storage helper is fail-fast on platform errors', (
     WidgetTester tester,
   ) async {

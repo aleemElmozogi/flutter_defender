@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.0] - 2026-06-08
+## [0.5.0] - 2026-07-07
 
 ### Added
 
@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `FlutterDefenderSensitiveGuard` now replaces concealed content with a `FlutterDefenderUiTheme`-styled placeholder when no explicit blocking overlay is active.
 - Guarded children are now hidden behind all active blocking overlays, including custom blocking builders.
 - Documentation now clarifies that native screenshot protection is window/root-surface level on Android and iOS, even when using the scoped Dart content guard.
+- Documented that `enableRaspDetection` blocks guarded content when a debugger is attached, including during debug tooling sessions where the flag is forced on.
+- `enableProxyVpnDetection` and `enableRaspDetection` now default to `false` in every build mode and must be enabled explicitly.
+- Kept compatibility with Dart `>=3.10.1 <4.0.0` and Flutter `>=3.35.0`.
 
 ### Tests
 
