@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-07-07
+
+### Added
+
+- Added `FlutterDefenderSecureContentGuard` for concealing bounded sensitive regions such as cards, panels, and containers without rendering a route-level blocking screen.
+- Added `FlutterDefenderConcealmentPlaceholder` and `placeholderBuilder` support so guarded content can show themed replacement UI while concealed.
+- Added native iOS secure-surface wiring so the Flutter root view is wrapped in a secure text-entry backed container while guarded content is active through `setProtectionState(secureActive:)`.
+- Added iOS Swift Package Manager support while keeping CocoaPods support.
+- Added localized `protectedContentHidden` blocking message text for English, Arabic, Spanish, and French.
+
+### Changed
+
+- `FlutterDefenderSensitiveGuard` now replaces concealed content with a `FlutterDefenderUiTheme`-styled placeholder when no explicit blocking overlay is active.
+- Guarded children are now hidden behind all active blocking overlays, including custom blocking builders.
+- Documentation now clarifies that native screenshot protection is window/root-surface level on Android and iOS, even when using the scoped Dart content guard.
+- Documented that `enableRaspDetection` blocks guarded content when a debugger is attached, including during debug tooling sessions where the flag is forced on.
+- `enableProxyVpnDetection` and `enableRaspDetection` now default to `false` in every build mode and must be enabled explicitly.
+- Kept compatibility with Dart `>=3.10.1 <4.0.0` and Flutter `>=3.35.0`.
+
+### Tests
+
+- Added widget coverage for iOS inactive concealment placeholders and scoped secure-content concealment.
+- Verified `flutter analyze`, `flutter test`, and iOS simulator debug build.
+
 ## [0.4.0] - 2026-05-24
 
 ### Added

@@ -7,7 +7,8 @@ import 'package:pigeon/pigeon.dart';
     kotlinOut:
         'android/src/main/kotlin/aleem/flutter/defender/DefenderMessages.g.kt',
     kotlinOptions: KotlinOptions(package: 'aleem.flutter.defender'),
-    swiftOut: 'ios/Classes/DefenderMessages.g.swift',
+    swiftOut:
+        'ios/flutter_defender/Sources/flutter_defender/DefenderMessages.g.swift',
     swiftOptions: SwiftOptions(),
   ),
 )

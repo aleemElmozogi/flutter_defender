@@ -5,6 +5,7 @@
   "screenshotsBlocked": "Politique de sécurité : les captures d'écran ne sont pas autorisées sur les écrans sensibles.",
   "overlaysBlocked": "Politique de sécurité : les superpositions d'écran ne sont pas autorisées lorsque du contenu sensible est affiché.",
   "screenCaptureBlocked": "Politique de sécurité : l'enregistrement ou la duplication d'écran n'est pas autorisé.",
+  "protectedContentHidden": "Politique de sécurité : le contenu sensible est masqué pendant que la protection est active.",
   "foregroundRequired": "Politique de sécurité : les écrans sensibles exigent que l'application reste au premier plan.",
   "rootOrJailbreakBlocked": "Politique de sécurité : l'état de sécurité de cet appareil n'est pas fiable (root/jailbreak détecté).",
   "proxyOrVpnBlocked": "Politique de sécurité : l'utilisation d'un proxy ou d'un VPN n'est pas autorisée sur cet écran protégé.",

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_defender/flutter_defender.dart';
 import 'package:flutter_defender/flutter_defender_platform_interface.dart';
@@ -43,6 +45,7 @@ class FakeFlutterDefenderPlatform
   bool throwOnSecureRead = false;
   bool throwOnSecureDelete = false;
   bool throwOnSecureClearAll = false;
+  Completer<pigeon.NativeRuntimeState>? getRuntimeStateCompleter;
   Duration loadLifecycleSnapshotDelay = Duration.zero;
   int secureClearAllCallCount = 0;
 
@@ -59,6 +62,11 @@ class FakeFlutterDefenderPlatform
   Future<pigeon.NativeRuntimeState> getRuntimeState() async {
     if (throwOnGetRuntimeState) {
       throw PlatformException(code: 'runtime_state_failure');
+    }
+    final Completer<pigeon.NativeRuntimeState>? completer =
+        getRuntimeStateCompleter;
+    if (completer != null) {
+      return completer.future;
     }
     return runtimeState;
   }
@@ -168,6 +176,7 @@ void main() {
     'init wires native callbacks and pause persists lifecycle state',
     (WidgetTester tester) async {
       expect(fakePlatform.callbacks, isNotNull);
+      expect(fakePlatform.protectionCalls, isEmpty);
 
       defender.setAuthenticated(true);
       defender.didChangeAppLifecycleState(AppLifecycleState.paused);
@@ -242,6 +251,10 @@ void main() {
       await tester.pump();
 
       expect(defender.shouldConcealGuardedContent, isTrue);
+      expect(
+        find.text(FlutterDefenderMessages.protectedContentHidden),
+        findsOneWidget,
+      );
 
       defender.didChangeAppLifecycleState(AppLifecycleState.resumed);
       await tester.pump();
@@ -250,6 +263,203 @@ void main() {
     },
     variant: TargetPlatformVariant.only(TargetPlatform.iOS),
   );
+
+  testWidgets(
+    'resume clears inactive shield while native refresh is pending',
+    (WidgetTester tester) async {
+      expect(defender.shouldConcealGuardedContent, isFalse);
+
+      defender.didChangeAppLifecycleState(AppLifecycleState.inactive);
+      await tester.pump();
+
+      expect(defender.shouldConcealGuardedContent, isTrue);
+
+      fakePlatform.getRuntimeStateCompleter =
+          Completer<pigeon.NativeRuntimeState>();
+      defender.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await tester.pump();
+
+      expect(defender.shouldConcealGuardedContent, isFalse);
+
+      fakePlatform.getRuntimeStateCompleter!.complete(
+        fakePlatform.runtimeState,
+      );
+      fakePlatform.getRuntimeStateCompleter = null;
+      await tester.pumpAndSettle();
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
+
+  testWidgets('secure content guard conceals only its own subtree', (
+    WidgetTester tester,
+  ) async {
+    var outsideTaps = 0;
+    var insideTaps = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Column(
+            children: <Widget>[
+              ElevatedButton(
+                onPressed: () {
+                  outsideTaps += 1;
+                },
+                child: const Text('outside action'),
+              ),
+              SizedBox(
+                width: 280,
+                height: 180,
+                child: FlutterDefenderSecureContentGuard(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      insideTaps += 1;
+                    },
+                    child: const Text('inside secret'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    fakePlatform.emitScreenCaptureChanged(true);
+    await tester.pump();
+
+    expect(
+      find.text(FlutterDefenderMessages.protectedContentHidden),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        FlutterDefenderMessages.stringFor(
+          FlutterDefenderMessageId.screenCaptureBlocked,
+        ),
+      ),
+      findsNothing,
+    );
+
+    await tester.tap(find.text('outside action'));
+    await tester.tap(find.text('inside secret'), warnIfMissed: false);
+    await tester.pump();
+
+    expect(outsideTaps, 1);
+    expect(insideTaps, 0);
+  });
+
+  testWidgets('proxy vpn and rasp signals do not block by default', (
+    WidgetTester tester,
+  ) async {
+    fakePlatform.advancedSecuritySignals = pigeon.AdvancedSecuritySignals(
+      rootedOrJailbroken: false,
+      proxyEnabled: true,
+      vpnEnabled: true,
+      debuggerAttached: true,
+      tamperingDetected: true,
+      tamperingDetails: 'debugger,hooking',
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secure')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(defender.shouldConcealGuardedContent, isFalse);
+    expect(find.text('secure'), findsOneWidget);
+    expect(
+      find.text(
+        FlutterDefenderMessages.stringFor(
+          FlutterDefenderMessageId.proxyOrVpnBlocked,
+        ),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.text(
+        FlutterDefenderMessages.stringFor(
+          FlutterDefenderMessageId.tamperingBlocked,
+        ),
+      ),
+      findsNothing,
+    );
+  });
+
+  testWidgets('explicit proxy vpn detection blocks guarded content', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init(enableProxyVpnDetection: true);
+    fakePlatform.advancedSecuritySignals = pigeon.AdvancedSecuritySignals(
+      rootedOrJailbroken: false,
+      proxyEnabled: false,
+      vpnEnabled: true,
+      debuggerAttached: false,
+      tamperingDetected: false,
+      tamperingDetails: null,
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secure')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(defender.shouldConcealGuardedContent, isTrue);
+    expect(
+      find.text(
+        FlutterDefenderMessages.stringFor(
+          FlutterDefenderMessageId.proxyOrVpnBlocked,
+        ),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('explicit rasp detection blocks debugger tampering signals', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init(enableRaspDetection: true);
+    fakePlatform.advancedSecuritySignals = pigeon.AdvancedSecuritySignals(
+      rootedOrJailbroken: false,
+      proxyEnabled: false,
+      vpnEnabled: false,
+      debuggerAttached: true,
+      tamperingDetected: false,
+      tamperingDetails: 'debugger',
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secure')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(defender.shouldConcealGuardedContent, isTrue);
+    expect(
+      find.text(
+        FlutterDefenderMessages.stringFor(
+          FlutterDefenderMessageId.tamperingBlocked,
+        ),
+      ),
+      findsOneWidget,
+    );
+  });
 
   testWidgets('secure storage helper is fail-fast on platform errors', (
     WidgetTester tester,

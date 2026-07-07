@@ -35,6 +35,7 @@ class FlutterDefenderRuntimeState {
   bool overlayViolationActive = false;
   bool isAuthenticated = false;
   bool protectionReady = false;
+  bool nativeProtectionActive = false;
   bool pendingColdStartOtpPop = false;
   bool inactivePrivacyShieldActive = false;
   bool logoutTriggeredForCurrentBackground = false;
@@ -78,6 +79,7 @@ class FlutterDefenderRuntimeState {
     overlayViolationActive = false;
     isAuthenticated = false;
     protectionReady = false;
+    nativeProtectionActive = false;
     pendingColdStartOtpPop = false;
     inactivePrivacyShieldActive = false;
     logoutTriggeredForCurrentBackground = false;

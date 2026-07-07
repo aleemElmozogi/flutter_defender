@@ -80,7 +80,7 @@ extension DefenderDemoProfilePresentation on DefenderDemoProfile {
       DefenderDemoProfile.proxyVpnDetectionOn =>
         'Enables proxy and VPN checks in guarded routes.',
       DefenderDemoProfile.raspDetectionOn =>
-        'Enables debugger and tampering checks (basic RASP).',
+        'Enables debugger and tampering checks; attached debug sessions are blocked.',
       DefenderDemoProfile.secureStorageHelperOn =>
         'Enables secure storage helper and clears stored values on logout.',
     };
@@ -105,7 +105,7 @@ extension DefenderDemoProfilePresentation on DefenderDemoProfile {
       DefenderDemoProfile.proxyVpnDetectionOn =>
         'Enable a VPN or device proxy and verify guarded routes are blocked.',
       DefenderDemoProfile.raspDetectionOn =>
-        'Attach debugger in release-like validation and verify guarded routes are blocked.',
+        'Run with and without an attached debugger to verify guarded routes only unblock when no tampering signal is present.',
       DefenderDemoProfile.secureStorageHelperOn =>
         'Store then clear a value using the helper, then sign out and verify values are removed.',
     };
@@ -217,6 +217,8 @@ String _resolveBlockingMessage(
       'Resolver demo: another app is drawing over this sensitive screen.',
     FlutterDefenderMessageId.screenCaptureBlocked =>
       'Resolver demo: screen recording or mirroring is blocked here.',
+    FlutterDefenderMessageId.protectedContentHidden =>
+      'Resolver demo: protected content is hidden while policy checks are active.',
     FlutterDefenderMessageId.foregroundRequired =>
       'Resolver demo: this protected route must stay in the foreground.',
     FlutterDefenderMessageId.rootOrJailbreakBlocked =>

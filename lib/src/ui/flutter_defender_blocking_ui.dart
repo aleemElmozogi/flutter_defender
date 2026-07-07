@@ -1,6 +1,33 @@
 part of '../../flutter_defender.dart';
 
 extension _FlutterDefenderBlockingUi on FlutterDefender {
+  Widget buildConcealmentPlaceholder(
+    BuildContext context, {
+    required bool compact,
+    WidgetBuilder? builder,
+  }) {
+    if (builder != null) {
+      return builder(context);
+    }
+
+    return _wrapBlockingLocalizationScope(
+      context,
+      Builder(
+        builder: (BuildContext innerContext) {
+          return FlutterDefenderConcealmentPlaceholder(
+            title: _resolveBlockingTitle(innerContext),
+            message: _resolveBlockingMessage(
+              innerContext,
+              FlutterDefenderMessageId.protectedContentHidden,
+            ),
+            theme: _config.uiTheme,
+            compact: compact,
+          );
+        },
+      ),
+    );
+  }
+
   Widget buildBlockingOverlay(BuildContext context) {
     final FlutterDefenderMessageId? messageId =
         _runtime.blockingMessageId.value;

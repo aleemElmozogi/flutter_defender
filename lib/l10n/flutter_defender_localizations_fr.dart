@@ -28,6 +28,10 @@ class FlutterDefenderLocalizationsFr extends FlutterDefenderLocalizations {
       'Politique de sécurité : l\'enregistrement ou la duplication d\'écran n\'est pas autorisé.';
 
   @override
+  String get protectedContentHidden =>
+      'Politique de sécurité : le contenu sensible est masqué pendant que la protection est active.';
+
+  @override
   String get foregroundRequired =>
       'Politique de sécurité : les écrans sensibles exigent que l\'application reste au premier plan.';
 
