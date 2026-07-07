@@ -7,26 +7,32 @@ Pod::Spec.new do |s|
   s.version          = '0.5.0'
   s.summary          = 'Secure-screen protection for Flutter apps.'
   s.description      = <<-DESC
-Secure-screen protection for Flutter apps.
+A Flutter security plugin for guarded screens, lifecycle-aware concealment,
+runtime risk signals, secure storage helpers, and native request signing.
                        DESC
   s.homepage         = 'https://github.com/aleemElmozogi/flutter_defender'
-  s.license          = { :file => '../LICENSE' }
+  s.license          = { :type => 'Apache-2.0', :file => '../LICENSE' }
   s.author           = { 'Aleem Elmozogi' => 'abddo.55242@gmail.com' }
   s.source           = { :path => '.' }
-  s.source_files = 'Classes/**/*', '../src/native/**/*.{h,cpp}'
+  s.source_files = 'flutter_defender/Sources/flutter_defender/**/*.swift',
+                   'flutter_defender/Sources/flutter_defender_native/**/*.h',
+                   'flutter_defender/Sources/flutter_defender_native/Native/src/**/*.cpp'
+  s.public_header_files = []
+  s.private_header_files = 'flutter_defender/Sources/flutter_defender_native/Native/**/*.h',
+                           'flutter_defender/Sources/flutter_defender_native/include/**/*.h'
   s.dependency 'Flutter'
-  s.platform = :ios, '14.0'
+  s.platform = :ios, '13.0'
 
   # Flutter.framework does not contain a i386 slice.
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
     'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
-    'HEADER_SEARCH_PATHS' => '$(inherited) "${PODS_TARGET_SRCROOT}/../src/native/include"',
+    'HEADER_SEARCH_PATHS' => '$(inherited) "${PODS_TARGET_SRCROOT}/flutter_defender/Sources/flutter_defender_native/Native/include"',
     'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
     'CLANG_CXX_LIBRARY' => 'libc++',
     'OTHER_CPLUSPLUSFLAGS' => '$(inherited) -fvisibility=hidden'
   }
   s.swift_version = '5.0'
 
-  s.resource_bundles = {'flutter_defender_privacy' => ['Resources/PrivacyInfo.xcprivacy']}
+  s.resource_bundles = {'flutter_defender_privacy' => ['flutter_defender/Sources/flutter_defender/PrivacyInfo.xcprivacy']}
 end

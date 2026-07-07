@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `FlutterDefenderSecureContentGuard` for concealing bounded sensitive regions such as cards, panels, and containers without rendering a route-level blocking screen.
 - Added `FlutterDefenderConcealmentPlaceholder` and `placeholderBuilder` support so guarded content can show themed replacement UI while concealed.
 - Added native iOS secure-surface wiring so the Flutter root view is wrapped in a secure text-entry backed container while guarded content is active through `setProtectionState(secureActive:)`.
+- Added iOS Swift Package Manager support while keeping CocoaPods support.
 - Added localized `protectedContentHidden` blocking message text for English, Arabic, Spanish, and French.
 
 ### Changed

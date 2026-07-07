@@ -439,14 +439,10 @@ private final class IosSecureSurfaceController {
   }
 
   private static func defaultFlutterRootView() -> UIView? {
-    if #available(iOS 13.0, *) {
-      let windows = UIApplication.shared.connectedScenes
-        .compactMap { $0 as? UIWindowScene }
-        .flatMap { $0.windows }
-      let window = windows.first { $0.isKeyWindow } ?? windows.first
-      return window?.rootViewController?.view ?? window?.subviews.first
-    }
-    let window = UIApplication.shared.keyWindow ?? UIApplication.shared.windows.first
+    let windows = UIApplication.shared.connectedScenes
+      .compactMap { $0 as? UIWindowScene }
+      .flatMap { $0.windows }
+    let window = windows.first { $0.isKeyWindow } ?? windows.first
     return window?.rootViewController?.view ?? window?.subviews.first
   }
 }
@@ -517,6 +513,7 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
   }
 
   public static func register(with registrar: FlutterPluginRegistrar) {
+    FlutterDefenderNativeLinker.keepLinked()
     let instance = FlutterDefenderPlugin(binaryMessenger: registrar.messenger())
     DefenderHostApiSetup.setUp(binaryMessenger: registrar.messenger(), api: instance)
   }
