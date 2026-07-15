@@ -215,6 +215,7 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
       return;
     }
     _showTemporaryBlocking(FlutterDefenderMessageId.screenshotsBlocked);
+    _notifyListeners();
   }
 
   void _handleScreenCaptureChanged(bool active) {

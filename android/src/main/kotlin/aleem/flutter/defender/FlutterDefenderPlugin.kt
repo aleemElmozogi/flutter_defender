@@ -29,6 +29,7 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
     private var secureActive = false
     private var overlayHardeningActive = false
     private var hideOverlayWindowsAvailable = true
+    private var lastEmittedForegroundState: Boolean? = null
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         snapshotStore = LifecycleSnapshotStore(binding.applicationContext)
         advancedSecurityDetector = AdvancedSecurityDetector(binding.applicationContext)
@@ -180,6 +181,13 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
         val wrapper = OverlayAwareWindowCallback(
             delegateCallback = callback,
             onObscuredTouch = { emitOverlayViolation() },
+            onWindowFocusChange = { hasFocus ->
+                if (!hasFocus) {
+                    emitForegroundState(false)
+                } else if (currentForegroundState()) {
+                    emitForegroundState(true)
+                }
+            },
             isActive = { overlayHardeningActive }
         )
         window.callback = wrapper
@@ -246,6 +254,8 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
     private fun emitOverlayViolation() = flutterApi?.onOverlayViolation {}
 
     private fun emitForegroundState(active: Boolean) {
+        if (lastEmittedForegroundState == active) return
+        lastEmittedForegroundState = active
         flutterApi?.onForegroundStateChanged(active) {}
     }
 
