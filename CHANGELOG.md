@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.5.1] - 2026-07-15
+## [0.6.0] - 2026-07-15
 
 ### Changed
 
@@ -17,11 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - iOS Keychain updates now reapply `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` to existing entries.
 - The current `authenticatedBackgroundTimeoutSeconds` option now takes precedence when the deprecated `pinBackgroundTimeoutSeconds` alias is also supplied.
 - Kotlin and C++ Android root indicators now share KernelSU, APatch, and legacy `su` paths, with parity enforced in CI.
-- Added opt-in `failClosedOnPlatformError` policy with a localized protection-unavailable blocking state; default behavior remains fail-open for compatibility.
+- Added opt-in `failClosedOnPlatformError` policy with a localized protection-unavailable blocking state; default behavior remains fail-open for compatibility. This adds `FlutterDefenderMessageId.protectionUnavailable`, so exhaustive `switch` statements over `FlutterDefenderMessageId` need a new case.
+- Android window-focus loss while a guard is active now conceals guarded content through a dedicated focus signal instead of a synthetic foreground transition; it no longer starts background timeouts or shows the `foregroundRequired` blocking screen. Timeouts remain tied to actual activity pause/resume.
 
 ### Fixed
 
-- Android trusted system prompts, including biometric authentication, no longer trigger the `foregroundRequired` blocking message when they only take window focus.
+- Android trusted system prompts, including biometric authentication, no longer trigger the `foregroundRequired` blocking message or background timeouts when they only take window focus, including on guarded screens; guarded content is concealed until focus returns.
 - Confirmed obscured-touch violations now retain the `overlaysBlocked` message even if the app also reports a foreground transition.
 - Inactive lifecycle transitions no longer start authenticated or OTP background timeouts before the app is actually paused.
 - The first guarded screen no longer consumes an initial all-false advanced-signal cache.

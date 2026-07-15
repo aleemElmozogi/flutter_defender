@@ -560,6 +560,8 @@ abstract class DefenderFlutterApi {
 
   void onForegroundStateChanged(bool active);
 
+  void onWindowFocusChanged(bool hasFocus);
+
   static void setUp(
     DefenderFlutterApi? api, {
     BinaryMessenger? binaryMessenger,
@@ -653,6 +655,31 @@ abstract class DefenderFlutterApi {
           final bool arg_active = args[0]! as bool;
           try {
             api.onForegroundStateChanged(arg_active);
+            return wrapResponse(empty: true);
+          } on PlatformException catch (e) {
+            return wrapResponse(error: e);
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
+          }
+        });
+      }
+    }
+    {
+      final pigeonVar_channel = BasicMessageChannel<Object?>(
+        'dev.flutter.pigeon.flutter_defender.DefenderFlutterApi.onWindowFocusChanged$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
+      if (api == null) {
+        pigeonVar_channel.setMessageHandler(null);
+      } else {
+        pigeonVar_channel.setMessageHandler((Object? message) async {
+          final List<Object?> args = message! as List<Object?>;
+          final bool arg_hasFocus = args[0]! as bool;
+          try {
+            api.onWindowFocusChanged(arg_hasFocus);
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);

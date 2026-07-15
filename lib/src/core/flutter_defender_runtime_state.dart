@@ -40,6 +40,7 @@ class FlutterDefenderRuntimeState {
   bool nativeProtectionActive = false;
   bool pendingColdStartOtpPop = false;
   bool inactivePrivacyShieldActive = false;
+  bool windowFocusConcealActive = false;
   bool logoutTriggeredForCurrentBackground = false;
   int? pausedAtMs;
   Timer? temporaryBlockingTimer;
@@ -59,6 +60,7 @@ class FlutterDefenderRuntimeState {
       !protectionReady ||
       pendingColdStartOtpPop ||
       inactivePrivacyShieldActive ||
+      windowFocusConcealActive ||
       hasPersistentBlockingSource;
 
   void cancelTimers() {
@@ -86,6 +88,7 @@ class FlutterDefenderRuntimeState {
     nativeProtectionActive = false;
     pendingColdStartOtpPop = false;
     inactivePrivacyShieldActive = false;
+    windowFocusConcealActive = false;
     logoutTriggeredForCurrentBackground = false;
     pausedAtMs = null;
     blockingSource = null;

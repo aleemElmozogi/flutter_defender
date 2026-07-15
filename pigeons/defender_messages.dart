@@ -73,4 +73,6 @@ abstract class DefenderFlutterApi {
   void onOverlayViolation();
 
   void onForegroundStateChanged(bool active);
+
+  void onWindowFocusChanged(bool hasFocus);
 }

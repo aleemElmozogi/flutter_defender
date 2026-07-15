@@ -360,6 +360,7 @@ Important limitations:
 ## Background Timeout Behavior
 
 - On iOS, guarded content is concealed immediately while the app is `inactive` and revealed again when the app becomes active.
+- On Android, focus-only interruptions over a guarded screen (for example biometric prompts or permission dialogs) conceal guarded content while focus is lost, but do not start background timeouts and do not show the `foregroundRequired` blocking screen. Timeouts start only when the activity is actually paused.
 - While an `FlutterDefenderOtpGuard` screen is active, background timeout pops only that OTP route.
 - While `setAuthenticated(true)` is active, background timeout calls `onLogoutRequested`.
 - Timeout state is persisted across process death and rechecked on the next launch.

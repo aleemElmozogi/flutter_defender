@@ -676,4 +676,21 @@ class DefenderFlutterApi(private val binaryMessenger: BinaryMessenger, private v
       } 
     }
   }
+  fun onWindowFocusChanged(hasFocusArg: Boolean, callback: (Result<Unit>) -> Unit)
+{
+    val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+    val channelName = "dev.flutter.pigeon.flutter_defender.DefenderFlutterApi.onWindowFocusChanged$separatedMessageChannelSuffix"
+    val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
+    channel.send(listOf(hasFocusArg)) {
+      if (it is List<*>) {
+        if (it.size > 1) {
+          callback(Result.failure(FlutterError(it[0] as String, it[1] as String, it[2] as String?)))
+        } else {
+          callback(Result.success(Unit))
+        }
+      } else {
+        callback(Result.failure(DefenderMessagesPigeonUtils.createConnectionError(channelName)))
+      } 
+    }
+  }
 }

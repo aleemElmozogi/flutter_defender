@@ -157,6 +157,10 @@ class FakeFlutterDefenderPlatform
   void emitForegroundStateChanged(bool active) {
     callbacks?.onForegroundStateChanged?.call(active);
   }
+
+  void emitWindowFocusChanged(bool hasFocus) {
+    callbacks?.onWindowFocusChanged?.call(hasFocus);
+  }
 }
 
 void main() {
@@ -242,6 +246,58 @@ void main() {
     expect(defender.hasBlockingOverlay, isFalse);
     expect(find.text('secure'), findsOneWidget);
   });
+
+  testWidgets(
+    'window focus loss conceals guarded content without blocking or timeout',
+    (WidgetTester tester) async {
+      defender.dispose();
+      defender = FlutterDefender.instance;
+      final DateTime base = DateTime(2026, 4, 12, 12);
+      defender.debugSetNowProvider(() => base);
+      var logoutCalls = 0;
+      await defender.init(
+        authenticatedBackgroundTimeoutSeconds: 1,
+        onLogoutRequested: () {
+          logoutCalls += 1;
+        },
+      );
+      defender.setAuthenticated(true);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: FlutterDefenderSensitiveGuard(
+            child: Scaffold(body: Text('secure')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      fakePlatform.emitWindowFocusChanged(false);
+      await tester.pump();
+
+      expect(defender.shouldConcealGuardedContent, isTrue);
+      expect(defender.hasBlockingOverlay, isFalse);
+      expect(
+        find.text(FlutterDefenderMessages.protectedContentHidden),
+        findsOneWidget,
+      );
+      expect(
+        find.text(FlutterDefenderMessages.foregroundRequired),
+        findsNothing,
+      );
+
+      defender.debugSetNowProvider(() => base.add(const Duration(seconds: 30)));
+      fakePlatform.emitWindowFocusChanged(true);
+      await tester.pumpAndSettle();
+
+      expect(logoutCalls, 0);
+      expect(defender.shouldConcealGuardedContent, isFalse);
+      expect(
+        find.text(FlutterDefenderMessages.protectedContentHidden),
+        findsNothing,
+      );
+    },
+  );
 
   testWidgets(
     'android inactive system prompt does not trigger blocking or timeout',

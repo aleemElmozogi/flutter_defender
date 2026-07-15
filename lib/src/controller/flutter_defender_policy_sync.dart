@@ -31,7 +31,9 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
       }
     }
 
-    _runtime.overlayViolationActive = false;
+    _runtime
+      ..overlayViolationActive = false
+      ..windowFocusConcealActive = false;
     await _syncProtection(concealUntilProtectionReady: false);
   }
 
@@ -97,6 +99,7 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
       }
       _runtime
         ..platformUnavailableBlocked = false
+        ..windowFocusConcealActive = false
         ..rootBlocked = false
         ..proxyOrVpnBlocked = false
         ..tamperingBlocked = false;
@@ -236,11 +239,26 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
     _notifyListeners();
   }
 
+  /// Focus-only interruptions (for example a biometric prompt window over a
+  /// guarded screen) conceal guarded content but never start background
+  /// timeouts or the foreground blocking screen; those remain tied to actual
+  /// activity pause/resume signals.
+  void _handleWindowFocusChanged(bool hasFocus) {
+    final bool concealActive = !hasFocus && _activeGuards.isNotEmpty;
+    if (_runtime.windowFocusConcealActive == concealActive) {
+      return;
+    }
+    _runtime.windowFocusConcealActive = concealActive;
+    _notifyListeners();
+  }
+
   void _handleForegroundStateChanged(bool active) {
     final bool wasForeground = _runtime.isForeground;
     _runtime.isForeground = active;
     if (active) {
-      _runtime.overlayViolationActive = false;
+      _runtime
+        ..overlayViolationActive = false
+        ..windowFocusConcealActive = false;
       unawaited(_handleAppResumed());
       return;
     }

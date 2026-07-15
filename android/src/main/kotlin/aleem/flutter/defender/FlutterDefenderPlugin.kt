@@ -181,17 +181,12 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
         val wrapper = OverlayAwareWindowCallback(
             delegateCallback = callback,
             onObscuredTouch = { emitOverlayViolation() },
-            onWindowFocusChange = { hasFocus ->
-                if (!hasFocus) {
-                    emitForegroundState(false)
-                } else if (currentForegroundState()) {
-                    emitForegroundState(true)
-                }
-            },
+            onWindowFocusChange = ::emitWindowFocusState,
             isActive = { overlayHardeningActive }
         )
         window.callback = wrapper
         windowCallbackWrapper = wrapper
+        emitWindowFocusState(window.decorView.hasWindowFocus())
     }
 
     private fun restoreWindowCallback() {
@@ -257,6 +252,10 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
         if (lastEmittedForegroundState == active) return
         lastEmittedForegroundState = active
         flutterApi?.onForegroundStateChanged(active) {}
+    }
+
+    private fun emitWindowFocusState(hasFocus: Boolean) {
+        flutterApi?.onWindowFocusChanged(hasFocus) {}
     }
 
     private fun currentForegroundState(): Boolean {

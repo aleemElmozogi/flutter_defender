@@ -25,6 +25,11 @@ class _DefenderFlutterApiAdapter extends DefenderFlutterApi {
   void onScreenshotDetected() {
     _callbacks.onScreenshotDetected?.call();
   }
+
+  @override
+  void onWindowFocusChanged(bool hasFocus) {
+    _callbacks.onWindowFocusChanged?.call(hasFocus);
+  }
 }
 
 class PigeonFlutterDefenderPlatform extends FlutterDefenderPlatform {
