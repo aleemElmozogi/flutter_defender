@@ -425,9 +425,12 @@ This repository includes GitHub Actions for CI and publishing:
   changelog entry use the same version.
 - Pushes to `main` / `master` rerun those checks, verify that `pubspec.yaml`
   contains a version higher than the previous branch tip, and then create a
-  matching Git tag such as `v0.5.1`.
-- Pushing that tag triggers the publish workflow, which runs a final
-  `flutter pub publish --dry-run` and then publishes to pub.dev.
+  matching Git tag such as `v0.6.0`.
+- Pushing that tag triggers the publish workflow, which reruns the full
+  analyze/test gate (package, example, and native known-answer tests), checks
+  that the tag matches the `pubspec.yaml` version, and only then runs
+  `flutter pub publish --dry-run` followed by the actual publish to pub.dev.
+  A manually pushed tag therefore cannot publish untested code.
 
 Important notes:
 

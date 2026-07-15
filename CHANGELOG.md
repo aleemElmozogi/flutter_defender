@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added Android lifecycle tracking and Dart message-priority regressions for trusted system prompts, overlays, and actual background transitions.
 - Added request-signer unit coverage and RFC 4231 HMAC-SHA256 known-answer tests enforced in CI.
+- The publish workflow now reruns the full analyze/test gate and verifies the release tag matches `pubspec.yaml` before publishing to pub.dev.
 
 ## [0.5.0] - 2026-07-07
 
