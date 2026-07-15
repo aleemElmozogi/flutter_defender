@@ -336,13 +336,6 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
     switch (state) {
       case AppLifecycleState.inactive:
         _setInactivePrivacyShield(active: _shouldShieldOnInactive);
-        if (_runtime.pausedAtMs == null) {
-          final int nowMs = _nowProvider().millisecondsSinceEpoch;
-          _runtime
-            ..pausedAtMs = nowMs
-            ..logoutTriggeredForCurrentBackground = false;
-          unawaited(_persistLifecycleSnapshot(lastBackgroundedAtMs: nowMs));
-        }
         break;
       case AppLifecycleState.hidden:
         break;

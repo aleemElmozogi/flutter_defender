@@ -41,17 +41,17 @@ extension _FlutterDefenderPolicyBlocking on FlutterDefender {
       );
       return;
     }
-    if (_config.enableForegroundCheck && !_runtime.isForeground) {
-      _showBlocking(
-        FlutterDefenderMessageId.foregroundRequired,
-        DefenderBlockingSource.foreground,
-      );
-      return;
-    }
     if (_runtime.overlayViolationActive) {
       _showBlocking(
         FlutterDefenderMessageId.overlaysBlocked,
         DefenderBlockingSource.overlay,
+      );
+      return;
+    }
+    if (_config.enableForegroundCheck && !_runtime.isForeground) {
+      _showBlocking(
+        FlutterDefenderMessageId.foregroundRequired,
+        DefenderBlockingSource.foreground,
       );
       return;
     }

@@ -146,6 +146,10 @@ class FakeFlutterDefenderPlatform
     callbacks?.onScreenCaptureChanged?.call(active);
   }
 
+  void emitOverlayViolation() {
+    callbacks?.onOverlayViolation?.call();
+  }
+
   void emitForegroundStateChanged(bool active) {
     callbacks?.onForegroundStateChanged?.call(active);
   }
@@ -185,6 +189,133 @@ void main() {
       expect(fakePlatform.savedSnapshots.last.wasAuthenticated, isTrue);
     },
   );
+
+  testWidgets(
+    'android inactive system prompt does not trigger blocking or timeout',
+    (WidgetTester tester) async {
+      defender.dispose();
+      defender = FlutterDefender.instance;
+      final DateTime base = DateTime(2026, 4, 12, 12);
+      defender.debugSetNowProvider(() => base);
+      var logoutCalls = 0;
+      await defender.init(
+        authenticatedBackgroundTimeoutSeconds: 1,
+        onLogoutRequested: () {
+          logoutCalls += 1;
+        },
+      );
+      defender.setAuthenticated(true);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: FlutterDefenderSensitiveGuard(
+            child: Scaffold(body: Text('secure')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      defender.didChangeAppLifecycleState(AppLifecycleState.inactive);
+      defender.debugSetNowProvider(() => base.add(const Duration(seconds: 30)));
+      await tester.pump();
+
+      expect(find.text('secure'), findsOneWidget);
+      expect(defender.hasBlockingOverlay, isFalse);
+
+      defender.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      expect(logoutCalls, 0);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
+
+  testWidgets('overlay violation keeps the overlay-specific message', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init(
+      blockingScreenBuilder: (String message) => Center(child: Text(message)),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates:
+            FlutterDefenderLocalizations.localizationsDelegates,
+        supportedLocales: FlutterDefenderLocalizations.supportedLocales,
+        home: const FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secure')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    fakePlatform.emitOverlayViolation();
+    fakePlatform.emitForegroundStateChanged(false);
+    await tester.pumpAndSettle();
+
+    expect(defender.hasBlockingOverlay, isTrue);
+    expect(
+      find.text(
+        FlutterDefenderMessages.stringFor(
+          FlutterDefenderMessageId.overlaysBlocked,
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        FlutterDefenderMessages.stringFor(
+          FlutterDefenderMessageId.foregroundRequired,
+        ),
+      ),
+      findsNothing,
+    );
+  });
+
+  testWidgets('foreground message appears for an actual background signal', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init(
+      blockingScreenBuilder: (String message) => Center(child: Text(message)),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates:
+            FlutterDefenderLocalizations.localizationsDelegates,
+        supportedLocales: FlutterDefenderLocalizations.supportedLocales,
+        home: const FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secure')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    fakePlatform.emitForegroundStateChanged(false);
+    await tester.pumpAndSettle();
+
+    expect(defender.hasBlockingOverlay, isTrue);
+    expect(
+      find.text(
+        FlutterDefenderMessages.stringFor(
+          FlutterDefenderMessageId.foregroundRequired,
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        FlutterDefenderMessages.stringFor(
+          FlutterDefenderMessageId.overlaysBlocked,
+        ),
+      ),
+      findsNothing,
+    );
+  });
 
   testWidgets('blocking overlay prevents interaction for custom builders', (
     WidgetTester tester,

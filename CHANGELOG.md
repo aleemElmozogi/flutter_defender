@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Android trusted system prompts, including biometric authentication, no longer trigger the `foregroundRequired` blocking message when they only take window focus.
+- Confirmed obscured-touch violations now retain the `overlaysBlocked` message even if the app also reports a foreground transition.
+- Inactive lifecycle transitions no longer start authenticated or OTP background timeouts before the app is actually paused.
+
+### Tests
+
+- Added Android lifecycle tracking and Dart message-priority regressions for trusted system prompts, overlays, and actual background transitions.
+
 ## [0.5.0] - 2026-07-07
 
 ### Added

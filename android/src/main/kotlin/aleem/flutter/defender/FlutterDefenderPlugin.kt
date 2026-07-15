@@ -3,7 +3,6 @@ package aleem.flutter.defender
 import android.app.Activity
 import android.os.Build
 import android.util.Log
-import android.view.ViewTreeObserver
 import android.view.Window
 import android.view.WindowManager
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -25,7 +24,7 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
     private var secureStorageHelper: SecureStorageHelper? = null
     private var detectorExecutor: ExecutorService? = null
     private var screenCaptureCallbackHandle: Any? = null
-    private var windowFocusListener: ViewTreeObserver.OnWindowFocusChangeListener? = null
+    private var foregroundLifecycleTracker: ForegroundLifecycleTracker? = null
     private var windowCallbackWrapper: OverlayAwareWindowCallback? = null
     private var secureActive = false
     private var overlayHardeningActive = false
@@ -53,7 +52,7 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         DefenderHostApi.setUp(binding.binaryMessenger, null)
         unregisterScreenCaptureCallback()
-        removeWindowFocusListener()
+        unregisterForegroundLifecycleTracker()
         restoreWindowCallback()
         flutterApi = null
         snapshotStore = null
@@ -137,8 +136,8 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
     }
 
     private fun rebindActivityHooks() {
+        registerForegroundLifecycleTracker()
         registerScreenCaptureCallback()
-        installWindowFocusListener()
         applyProtectionState()
         emitForegroundState(currentForegroundState())
         scheduleSecurityRefresh()
@@ -146,7 +145,7 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
 
     private fun releaseActivity() {
         unregisterScreenCaptureCallback()
-        removeWindowFocusListener()
+        unregisterForegroundLifecycleTracker()
         restoreWindowCallback()
         activity = null
     }
@@ -235,26 +234,24 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
         screenCaptureCallbackHandle = null
     }
 
-    private fun installWindowFocusListener() {
+    private fun registerForegroundLifecycleTracker() {
         val activeActivity = activity ?: return
-        if (windowFocusListener != null) {
+        if (foregroundLifecycleTracker != null) {
             return
         }
-        val listener = ViewTreeObserver.OnWindowFocusChangeListener { hasFocus ->
-            emitForegroundState(hasFocus)
-        }
-        activeActivity.window.decorView.viewTreeObserver.addOnWindowFocusChangeListener(listener)
-        windowFocusListener = listener
+        val tracker = ForegroundLifecycleTracker(
+            targetActivity = { activity },
+            onForegroundChanged = ::emitForegroundState
+        )
+        activeActivity.application.registerActivityLifecycleCallbacks(tracker)
+        foregroundLifecycleTracker = tracker
     }
 
-    private fun removeWindowFocusListener() {
+    private fun unregisterForegroundLifecycleTracker() {
         val activeActivity = activity ?: return
-        val listener = windowFocusListener ?: return
-        val observer = activeActivity.window.decorView.viewTreeObserver
-        if (observer.isAlive) {
-            observer.removeOnWindowFocusChangeListener(listener)
-        }
-        windowFocusListener = null
+        val tracker = foregroundLifecycleTracker ?: return
+        activeActivity.application.unregisterActivityLifecycleCallbacks(tracker)
+        foregroundLifecycleTracker = null
     }
 
     private fun emitOverlayViolation() = flutterApi?.onOverlayViolation {}
@@ -265,7 +262,8 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
 
     private fun currentForegroundState(): Boolean {
         val activeActivity = activity ?: return true
-        return !activeActivity.isFinishing && activeActivity.hasWindowFocus()
+        return foregroundLifecycleTracker?.isForeground
+            ?: (!activeActivity.isFinishing && !activeActivity.isDestroyed)
     }
 
     private fun scheduleSecurityRefresh() {
