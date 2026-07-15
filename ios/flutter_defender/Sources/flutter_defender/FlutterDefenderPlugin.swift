@@ -294,6 +294,7 @@ private final class IosSecureSurfaceTextField: UITextField {
 private final class IosSecureSurfaceController {
   private let viewProvider: () -> UIView?
   private var secureTextField: IosSecureSurfaceTextField?
+  private var pendingEnable = false
   private weak var securedView: UIView?
   private weak var originalSuperview: UIView?
   private var originalIndex = 0
@@ -307,7 +308,12 @@ private final class IosSecureSurfaceController {
 
   func setEnabled(_ enabled: Bool) {
     if Thread.isMainThread {
-      enabled ? enableOrRefresh() : disable()
+      if enabled {
+        enableOrDefer()
+      } else {
+        pendingEnable = false
+        disable()
+      }
       return
     }
     DispatchQueue.main.async { [weak self] in
@@ -315,16 +321,51 @@ private final class IosSecureSurfaceController {
     }
   }
 
-  func refreshIfEnabled() {
+  /// Re-evaluates protection when the app returns to the foreground. Completes
+  /// an enable that had to be deferred during launch, and otherwise rebuilds an
+  /// existing secure surface from scratch so a canvas that came up blank at
+  /// cold start is recreated rather than left stranded (the white-screen
+  /// recovery path).
+  func handleDidBecomeActive() {
     if Thread.isMainThread {
-      if secureTextField != nil {
-        enableOrRefresh()
+      if pendingEnable {
+        enableOrDefer()
+      } else if secureTextField != nil {
+        disable()
+        enable()
       }
       return
     }
     DispatchQueue.main.async { [weak self] in
-      self?.refreshIfEnabled()
+      self?.handleDidBecomeActive()
     }
+  }
+
+  /// Engages the secure surface only once the host window is ready. During
+  /// launch the reparenting trick can leave a permanently blank surface if the
+  /// application state is not yet `.active` or the Flutter root view has no
+  /// laid-out bounds, so we defer and complete it from `handleDidBecomeActive`.
+  private func enableOrDefer() {
+    guard isReadyForSecureSurface() else {
+      pendingEnable = true
+      return
+    }
+    pendingEnable = false
+    enableOrRefresh()
+  }
+
+  private func isReadyForSecureSurface() -> Bool {
+    guard UIApplication.shared.applicationState == .active else {
+      return false
+    }
+    guard let view = viewProvider(),
+          view.superview != nil,
+          view.bounds.width > 0,
+          view.bounds.height > 0
+    else {
+      return false
+    }
+    return true
   }
 
   private func enableOrRefresh() {
@@ -664,7 +705,7 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
       object: nil,
       queue: .main
     ) { [weak self] _ in
-      self?.secureSurfaceController.refreshIfEnabled()
+      self?.secureSurfaceController.handleDidBecomeActive()
       self?.flutterApi.onForegroundStateChanged(active: true) { _ in }
     }
 
