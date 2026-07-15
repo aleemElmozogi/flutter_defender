@@ -3,6 +3,11 @@ import 'dart:typed_data';
 
 import '../native/flutter_defender_native.dart';
 
+/// Signs a canonical request payload with the supplied key bytes.
+typedef FlutterDefenderHmacSigner =
+    String? Function({required Uint8List payload, required Uint8List key});
+
+/// Timestamp and signature headers produced for an outgoing request.
 class FlutterDefenderSignedRequest {
   const FlutterDefenderSignedRequest({
     required this.timestamp,
@@ -18,12 +23,16 @@ class FlutterDefenderSignedRequest {
   };
 }
 
+/// Produces native HMAC-SHA256 signatures for exact outgoing request bodies.
 class FlutterDefenderRequestSigner {
   FlutterDefenderRequestSigner({
     required String secretSalt,
     DateTime Function()? nowProvider,
+    FlutterDefenderHmacSigner? hmacSigner,
   }) : _secretSaltBytes = Uint8List.fromList(utf8.encode(secretSalt)),
-       _nowProvider = nowProvider ?? DateTime.now {
+       _nowProvider = nowProvider ?? DateTime.now,
+       _hmacSigner =
+           hmacSigner ?? FlutterDefenderNative.instance.signHmacSha256Hex {
     if (secretSalt.isEmpty) {
       throw ArgumentError.value(secretSalt, 'secretSalt', 'Must not be empty.');
     }
@@ -31,6 +40,7 @@ class FlutterDefenderRequestSigner {
 
   final Uint8List _secretSaltBytes;
   final DateTime Function() _nowProvider;
+  final FlutterDefenderHmacSigner _hmacSigner;
 
   FlutterDefenderSignedRequest sign({
     required List<int> bodyBytes,
@@ -42,10 +52,7 @@ class FlutterDefenderRequestSigner {
       bodyBytes: bodyBytes,
       timestamp: resolvedTimestamp,
     );
-    final signature = FlutterDefenderNative.instance.signHmacSha256Hex(
-      payload: payload,
-      key: _secretSaltBytes,
-    );
+    final signature = _hmacSigner(payload: payload, key: _secretSaltBytes);
     if (signature == null) {
       throw StateError('Flutter Defender native signer is unavailable.');
     }

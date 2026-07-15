@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../ui/flutter_defender_message_id.dart';
 
 enum DefenderBlockingSource {
+  platformUnavailable,
   emulator,
   root,
   proxyVpn,
@@ -26,6 +27,7 @@ class FlutterDefenderRuntimeState {
   bool isForeground = true;
   bool screenCaptureActive = false;
   bool emulatorBlocked = false;
+  bool platformUnavailableBlocked = false;
   bool rootBlocked = false;
   bool proxyOrVpnBlocked = false;
   bool tamperingBlocked = false;
@@ -44,6 +46,7 @@ class FlutterDefenderRuntimeState {
   DefenderBlockingSource? blockingSource;
 
   bool get hasPersistentBlockingSource =>
+      blockingSource == DefenderBlockingSource.platformUnavailable ||
       blockingSource == DefenderBlockingSource.emulator ||
       blockingSource == DefenderBlockingSource.root ||
       blockingSource == DefenderBlockingSource.proxyVpn ||
@@ -70,6 +73,7 @@ class FlutterDefenderRuntimeState {
     isForeground = true;
     screenCaptureActive = false;
     emulatorBlocked = false;
+    platformUnavailableBlocked = false;
     rootBlocked = false;
     proxyOrVpnBlocked = false;
     tamperingBlocked = false;

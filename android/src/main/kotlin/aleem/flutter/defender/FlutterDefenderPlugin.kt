@@ -29,16 +29,6 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
     private var secureActive = false
     private var overlayHardeningActive = false
     private var hideOverlayWindowsAvailable = true
-    @Volatile
-    private var advancedSecuritySignalsCache = AdvancedSecuritySignals(
-        rootedOrJailbroken = false,
-        proxyEnabled = false,
-        vpnEnabled = false,
-        debuggerAttached = false,
-        tamperingDetected = false,
-        tamperingDetails = null
-    )
-
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         snapshotStore = LifecycleSnapshotStore(binding.applicationContext)
         advancedSecurityDetector = AdvancedSecurityDetector(binding.applicationContext)
@@ -46,7 +36,6 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
         detectorExecutor = Executors.newSingleThreadExecutor()
         flutterApi = DefenderFlutterApi(binding.binaryMessenger)
         DefenderHostApi.setUp(binding.binaryMessenger, this)
-        scheduleSecurityRefresh()
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
@@ -58,7 +47,7 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
         snapshotStore = null
         secureStorageHelper = null
         advancedSecurityDetector = null
-        detectorExecutor?.shutdownNow()
+        detectorExecutor?.shutdown()
         detectorExecutor = null
     }
 
@@ -80,9 +69,6 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
         this.secureActive = secureActive
         this.overlayHardeningActive = overlayHardeningActive
         applyProtectionState()
-        if (secureActive || overlayHardeningActive) {
-            scheduleSecurityRefresh()
-        }
     }
 
     override fun getRuntimeState(): NativeRuntimeState {
@@ -95,32 +81,36 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
         )
     }
 
-    override fun getAdvancedSecuritySignals(): AdvancedSecuritySignals {
-        return advancedSecuritySignalsCache
+    override fun getAdvancedSecuritySignals(
+        callback: (Result<AdvancedSecuritySignals>) -> Unit
+    ) {
+        val detector = advancedSecurityDetector
+            ?: return callback(Result.failure(IllegalStateException("Security detector is unavailable.")))
+        runOnWorker(callback) { detector.collectSignals() }
     }
 
-    override fun secureWrite(key: String, value: String) {
+    override fun secureWrite(key: String, value: String, callback: (Result<Unit>) -> Unit) {
         val helper = secureStorageHelper
-            ?: throw IllegalStateException("Secure storage is unavailable.")
-        helper.write(key, value)
+            ?: return callback(Result.failure(IllegalStateException("Secure storage is unavailable.")))
+        runOnWorker(callback) { helper.write(key, value) }
     }
 
-    override fun secureRead(key: String): String? {
+    override fun secureRead(key: String, callback: (Result<String?>) -> Unit) {
         val helper = secureStorageHelper
-            ?: throw IllegalStateException("Secure storage is unavailable.")
-        return helper.read(key)
+            ?: return callback(Result.failure(IllegalStateException("Secure storage is unavailable.")))
+        runOnWorker(callback) { helper.read(key) }
     }
 
-    override fun secureDelete(key: String) {
+    override fun secureDelete(key: String, callback: (Result<Unit>) -> Unit) {
         val helper = secureStorageHelper
-            ?: throw IllegalStateException("Secure storage is unavailable.")
-        helper.delete(key)
+            ?: return callback(Result.failure(IllegalStateException("Secure storage is unavailable.")))
+        runOnWorker(callback) { helper.delete(key) }
     }
 
-    override fun secureClearAll() {
+    override fun secureClearAll(callback: (Result<Unit>) -> Unit) {
         val helper = secureStorageHelper
-            ?: throw IllegalStateException("Secure storage is unavailable.")
-        helper.clearAll()
+            ?: return callback(Result.failure(IllegalStateException("Secure storage is unavailable.")))
+        runOnWorker(callback) { helper.clearAll() }
     }
 
     override fun saveLifecycleSnapshot(snapshot: LifecycleSnapshot) {
@@ -140,7 +130,6 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
         registerScreenCaptureCallback()
         applyProtectionState()
         emitForegroundState(currentForegroundState())
-        scheduleSecurityRefresh()
     }
 
     private fun releaseActivity() {
@@ -266,19 +255,13 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
             ?: (!activeActivity.isFinishing && !activeActivity.isDestroyed)
     }
 
-    private fun scheduleSecurityRefresh() {
-        val detector = advancedSecurityDetector ?: return
-        val executor = detectorExecutor ?: return
+    private fun <T> runOnWorker(callback: (Result<T>) -> Unit, operation: () -> T) {
+        val executor = detectorExecutor
+            ?: return callback(Result.failure(IllegalStateException("Background worker is unavailable.")))
         try {
-            executor.execute {
-                try {
-                    advancedSecuritySignalsCache = detector.collectSignals()
-                } catch (error: Throwable) {
-                    Log.w(TAG, "Advanced security signal refresh failed.", error)
-                }
-            }
+            executor.execute { callback(runCatching(operation)) }
         } catch (error: RejectedExecutionException) {
-            Log.w(TAG, "Advanced security signal refresh was rejected.", error)
+            callback(Result.failure(error))
         }
     }
 }

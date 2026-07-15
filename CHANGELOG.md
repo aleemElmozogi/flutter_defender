@@ -7,15 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-07-15
+
+### Changed
+
+- Advanced platform signals now return a fresh background-queue collection, native FFI probes run off the Dart UI isolate, and runtime/advanced state requests run concurrently.
+- Regenerated Pigeon bindings with the locked generator version and declared their `meta` runtime dependency explicitly.
+- Android encrypted preferences and iOS Keychain operations now run on native background queues.
+- iOS Keychain updates now reapply `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` to existing entries.
+- The current `authenticatedBackgroundTimeoutSeconds` option now takes precedence when the deprecated `pinBackgroundTimeoutSeconds` alias is also supplied.
+- Kotlin and C++ Android root indicators now share KernelSU, APatch, and legacy `su` paths, with parity enforced in CI.
+- Added opt-in `failClosedOnPlatformError` policy with a localized protection-unavailable blocking state; default behavior remains fail-open for compatibility.
+
 ### Fixed
 
 - Android trusted system prompts, including biometric authentication, no longer trigger the `foregroundRequired` blocking message when they only take window focus.
 - Confirmed obscured-touch violations now retain the `overlaysBlocked` message even if the app also reports a foreground transition.
 - Inactive lifecycle transitions no longer start authenticated or OTP background timeouts before the app is actually paused.
+- The first guarded screen no longer consumes an initial all-false advanced-signal cache.
+- OTP timeout callbacks no longer pop an unrelated route when the guarded route is not current, and disposed guards ignore delayed pop callbacks.
+
+### Documentation
+
+- Documented cold-start logout callback timing, native channel failure behavior, lifecycle snapshot storage, and request-signing replay requirements.
+- Added public API dartdoc for initialization, guard widgets, secure storage, and request signing.
 
 ### Tests
 
 - Added Android lifecycle tracking and Dart message-priority regressions for trusted system prompts, overlays, and actual background transitions.
+- Added request-signer unit coverage and RFC 4231 HMAC-SHA256 known-answer tests enforced in CI.
 
 ## [0.5.0] - 2026-07-07
 

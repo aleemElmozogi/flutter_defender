@@ -52,7 +52,11 @@ internal class AdvancedSecurityDetector(private val context: Context) {
             "/dev/com.koushikdutta.superuser.daemon/",
             "/system/xbin/daemonsu",
             "/data/adb/magisk",
-            "/sbin/.magisk"
+            "/sbin/.magisk",
+            "/debug_ramdisk/su",
+            "/data/adb/ksu",
+            "/data/adb/ap",
+            "/system/bin/ksud"
         )
         if (knownPaths.any { File(it).exists() }) {
             return true

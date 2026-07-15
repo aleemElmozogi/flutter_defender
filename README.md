@@ -24,7 +24,7 @@ There is no route-observer setup. A guarded screen protects itself before the se
 
 ```yaml
 dependencies:
-  flutter_defender: ^0.5.0
+  flutter_defender: ^0.5.1
 ```
 
 ### Android release emulator launch block
@@ -178,7 +178,8 @@ content.
 
 Options:
 - `otpBackgroundTimeoutSeconds`
-- `authenticatedBackgroundTimeoutSeconds`
+- `authenticatedBackgroundTimeoutSeconds` (default `120`; takes precedence
+  over the deprecated `pinBackgroundTimeoutSeconds` alias)
 - `enableForegroundCheck`
 - `enableEmulatorDetectionRelease`
 - `enableRootDetection` (defaults to `true` in release, `false` in debug/profile)
@@ -186,6 +187,7 @@ Options:
 - `enableRaspDetection` (default `false`)
 - `enableSecureStorageHelper` (default `false`)
 - `clearSecureStorageOnLogout` (default `false`)
+- `failClosedOnPlatformError` (default `false`)
 - `onLogoutRequested`
 - `onRootDetected`
 - `onProxyOrVpnDetected`
@@ -195,6 +197,20 @@ Options:
 - `blockingLocale`
 - `messageResolver`
 - `blockingTitleResolver`
+
+`onLogoutRequested` may run while `init()` restores an expired cold-start
+snapshot, before `runApp`. Keep it safe when no navigator or widget tree exists.
+
+### Native Failure Policy
+
+Runtime-state, advanced-signal, and native hardening channel failures are
+fail-open by default to preserve host-app availability. Runtime state falls
+back to foreground with no active capture, while advanced detection keeps any
+available native FFI signals. Set `failClosedOnPlatformError: true` to keep
+guarded content blocked with a protection-unavailable message when one of those
+calls fails; a later successful protection sync clears that state.
+
+Secure-storage errors are separate and always remain fail-fast.
 
 ## Advanced Security Layers
 
@@ -236,6 +252,12 @@ HMAC-SHA256 and returns headers you can attach to outgoing requests. Validate
 the signature server-side using the same timestamp, exact raw body bytes, and
 salt.
 
+The embedded salt is recoverable from a sufficiently inspected or modified app,
+so this is a tamper/replay signal, not client authentication. The server must
+enforce a short timestamp window and a replay cache (for example, keyed by
+signature plus timestamp); accepting a valid signature indefinitely makes a
+captured request replayable.
+
 ```dart
 final signer = FlutterDefenderRequestSigner(
   secretSalt: 'your_obfuscated_salt',
@@ -259,6 +281,7 @@ final headers = <String, String>{
 - Optional lifecycle integration: `clearSecureStorageOnLogout`
 - Failure policy: secure-storage platform errors are fail-fast and throw; only
   missing keys return `null` from `secureRead`.
+- Key generation and storage I/O run on native background queues.
 
 ```dart
 await FlutterDefender.instance.init(
@@ -325,11 +348,14 @@ await FlutterDefender.instance.init(
 
 Important limitations:
 - **Android overlay defense is mitigation-based.** The plugin hardens guarded screens and reports obscured-touch violations; it does not claim perfect detection of every hostile overlay.
+- **Runtime detectors are best-effort indicators.** Root-hiding and instrumentation can evade path/process checks, and Android proxy detection can miss network-specific proxy configuration that is not exposed through process system properties.
 - **Android secure screenshot protection is window-level.** `FLAG_SECURE` protects the activity window while a guard is active; it cannot be limited to one Dart widget subtree.
 - **iOS screenshot detection is after capture.** The system screenshot has already happened when the notification arrives.
 - **iOS guarded content uses a secure text-entry backed surface.** This is the closest practical equivalent to Telegram-style screenshot blanking, but it relies on iOS secure-rendering behavior and should be validated on real devices for each supported iOS release. Because Flutter renders through a shared native surface, native secure wrapping is applied to the Flutter root view while a guard is active.
 - **iOS uses privacy concealment, not hostile-overlay detection.** Guarded content is hidden when the app becomes inactive, such as during Control Center, Notification Center, Siri, calls, or app-switcher transitions.
 - **Release-only emulator/simulator blocking** applies on guarded screens when `enableEmulatorDetectionRelease` is enabled. On Android, the optional package launcher guard blocks release-like emulator launches before Flutter starts. On iOS, `flutter build ios --simulator --release` is already rejected by Flutter/Xcode tooling.
+- **Lifecycle snapshots are not secrets.** They contain timestamps and guard/session flags in `SharedPreferences` / `UserDefaults`; clearing app data removes the cold-start timeout evidence.
+- **Android secure storage still uses deprecated Jetpack `security-crypto`.** Existing storage remains supported for compatibility; migrate to direct Keystore-backed AES-GCM storage before removing that dependency in a breaking release.
 
 ## Background Timeout Behavior
 
@@ -382,6 +408,7 @@ flutter run
 ```bash
 flutter analyze
 flutter test
+c++ -std=c++17 -Wall -Wextra -Werror -I src/native/include src/native/src/crypto/defender_crypto.cpp test/native/defender_crypto_test.cpp -o /tmp/flutter_defender_crypto_test && /tmp/flutter_defender_crypto_test
 cd example && flutter build apk --release
 cd example && flutter build ios --simulator --debug --no-pub
 cd example && flutter test
@@ -393,9 +420,11 @@ flutter pub publish --dry-run
 This repository includes GitHub Actions for CI and publishing:
 
 - Pull requests run package and example analysis plus tests.
+- CI verifies that `pubspec.yaml`, the podspec, and the latest released
+  changelog entry use the same version.
 - Pushes to `main` / `master` rerun those checks, verify that `pubspec.yaml`
   contains a version higher than the previous branch tip, and then create a
-  matching Git tag such as `v0.5.0`.
+  matching Git tag such as `v0.5.1`.
 - Pushing that tag triggers the publish workflow, which runs a final
   `flutter pub publish --dry-run` and then publishes to pub.dev.
 

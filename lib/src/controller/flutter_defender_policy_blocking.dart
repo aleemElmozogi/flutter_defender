@@ -6,6 +6,13 @@ extension _FlutterDefenderPolicyBlocking on FlutterDefender {
       _clearBlockingState();
       return;
     }
+    if (_runtime.platformUnavailableBlocked) {
+      _showBlocking(
+        FlutterDefenderMessageId.protectionUnavailable,
+        DefenderBlockingSource.platformUnavailable,
+      );
+      return;
+    }
     if (_runtime.emulatorBlocked) {
       _showBlocking(
         FlutterDefenderMessageId.emulatorReleaseBlocked,

@@ -4,7 +4,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'flutter_defender'
-  s.version          = '0.5.0'
+  s.version          = '0.5.1'
   s.summary          = 'Secure-screen protection for Flutter apps.'
   s.description      = <<-DESC
 A Flutter security plugin for guarded screens, lifecycle-aware concealment,

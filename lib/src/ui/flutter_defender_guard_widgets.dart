@@ -4,6 +4,7 @@ part of '../../flutter_defender.dart';
 typedef FlutterDefenderConcealmentBuilder =
     Widget Function(BuildContext context);
 
+/// Default replacement UI shown while protected content is concealed.
 class FlutterDefenderConcealmentPlaceholder extends StatelessWidget {
   const FlutterDefenderConcealmentPlaceholder({
     required this.message,
@@ -129,15 +130,19 @@ abstract class _FlutterDefenderGuardState<T extends StatefulWidget>
   }
 
   void _popCurrentRoute() {
+    if (!mounted) {
+      return;
+    }
     final ModalRoute<dynamic>? route = ModalRoute.of(context);
-    if (route != null && route.isCurrent) {
-      Navigator.of(context).maybePop();
+    if (route == null) {
       return;
     }
     final NavigatorState navigator = Navigator.of(context);
-    if (navigator.canPop()) {
-      navigator.pop();
+    if (route.isCurrent) {
+      navigator.maybePop();
+      return;
     }
+    navigator.removeRoute(route);
   }
 
   @override
@@ -206,6 +211,7 @@ abstract class _FlutterDefenderGuardState<T extends StatefulWidget>
   }
 }
 
+/// Protects a sensitive route and can display a full blocking overlay.
 class FlutterDefenderSensitiveGuard extends StatefulWidget {
   const FlutterDefenderSensitiveGuard({
     required this.child,
@@ -234,6 +240,7 @@ class _FlutterDefenderSensitiveGuardState
       widget.placeholderBuilder;
 }
 
+/// Conceals only its child bounds while native protection remains active.
 class FlutterDefenderSecureContentGuard extends StatefulWidget {
   const FlutterDefenderSecureContentGuard({
     required this.child,
@@ -265,6 +272,7 @@ class _FlutterDefenderSecureContentGuardState
   bool get showsBlockingOverlay => false;
 }
 
+/// Protects an OTP route and removes that route after its background timeout.
 class FlutterDefenderOtpGuard extends StatefulWidget {
   const FlutterDefenderOtpGuard({required this.child, super.key});
 

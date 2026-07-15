@@ -11,6 +11,7 @@ extension _FlutterDefenderInit on FlutterDefender {
     required bool enableRaspDetection,
     required bool enableSecureStorageHelper,
     required bool clearSecureStorageOnLogout,
+    required bool failClosedOnPlatformError,
     required Widget Function(String message)? blockingScreenBuilder,
     required VoidCallback? onLogoutRequested,
     required VoidCallback? onRootDetected,
@@ -35,6 +36,7 @@ extension _FlutterDefenderInit on FlutterDefender {
         enableRaspDetection: enableRaspDetection,
         enableSecureStorageHelper: enableSecureStorageHelper,
         clearSecureStorageOnLogout: clearSecureStorageOnLogout,
+        failClosedOnPlatformError: failClosedOnPlatformError,
         blockingScreenBuilder: blockingScreenBuilder,
         onLogoutRequested: onLogoutRequested,
         onRootDetected: onRootDetected,
@@ -62,10 +64,10 @@ extension _FlutterDefenderInit on FlutterDefender {
 
       final pigeon.LifecycleSnapshot snapshot =
           await _safeLoadLifecycleSnapshot();
-      final pigeon.NativeRuntimeState runtimeState =
+      final _PlatformResult<pigeon.NativeRuntimeState> runtimeStateResult =
           await _safeGetRuntimeState();
 
-      _applyRuntimeState(runtimeState);
+      _applyRuntimeState(runtimeStateResult.value);
       await _applyColdStartSnapshot(snapshot);
       _runtime.initialized = true;
 

@@ -207,6 +207,7 @@ private final class IosSecureStorageHelper {
     ]
     let update: [String: Any] = [
       kSecValueData as String: data,
+      kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
     ]
     let updateStatus = SecItemUpdate(query as CFDictionary, update as CFDictionary)
     if updateStatus == errSecSuccess {
@@ -461,13 +462,9 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
     label: "flutter_defender.security.detector",
     qos: .utility
   )
-  private var advancedSignalsCache = AdvancedSecuritySignals(
-    rootedOrJailbroken: false,
-    proxyEnabled: false,
-    vpnEnabled: false,
-    debuggerAttached: false,
-    tamperingDetected: false,
-    tamperingDetails: nil
+  private let storageQueue = DispatchQueue(
+    label: "flutter_defender.secure.storage",
+    qos: .utility
   )
 
   private var screenshotObserver: NSObjectProtocol?
@@ -509,7 +506,6 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
     self.secureSurfaceController = IosSecureSurfaceController()
     super.init()
     startObservers()
-    scheduleSecurityRefresh()
   }
 
   public static func register(with registrar: FlutterPluginRegistrar) {
@@ -542,9 +538,6 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
 
   func setProtectionState(secureActive: Bool, overlayHardeningActive: Bool) throws {
     secureSurfaceController.setEnabled(secureActive)
-    if secureActive || overlayHardeningActive {
-      scheduleSecurityRefresh()
-    }
   }
 
   func getRuntimeState() throws -> NativeRuntimeState {
@@ -556,24 +549,50 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
     )
   }
 
-  func getAdvancedSecuritySignals() throws -> AdvancedSecuritySignals {
-    advancedSignalsCache
+  func getAdvancedSecuritySignals(
+    completion: @escaping (Result<AdvancedSecuritySignals, Error>) -> Void
+  ) {
+    let detector = securityDetector
+    detectorQueue.async {
+      let signals = detector.collectSignals()
+      DispatchQueue.main.async {
+        completion(.success(signals))
+      }
+    }
   }
 
-  func secureWrite(key: String, value: String) throws {
-    try secureStorageHelper.write(key: key, value: value)
+  func secureWrite(
+    key: String,
+    value: String,
+    completion: @escaping (Result<Void, Error>) -> Void
+  ) {
+    performStorage(completion: completion) { helper in
+      try helper.write(key: key, value: value)
+    }
   }
 
-  func secureRead(key: String) throws -> String? {
-    try secureStorageHelper.read(key: key)
+  func secureRead(
+    key: String,
+    completion: @escaping (Result<String?, Error>) -> Void
+  ) {
+    performStorage(completion: completion) { helper in
+      try helper.read(key: key)
+    }
   }
 
-  func secureDelete(key: String) throws {
-    try secureStorageHelper.delete(key: key)
+  func secureDelete(
+    key: String,
+    completion: @escaping (Result<Void, Error>) -> Void
+  ) {
+    performStorage(completion: completion) { helper in
+      try helper.delete(key: key)
+    }
   }
 
-  func secureClearAll() throws {
-    try secureStorageHelper.clearAll()
+  func secureClearAll(completion: @escaping (Result<Void, Error>) -> Void) {
+    performStorage(completion: completion) { helper in
+      try helper.clearAll()
+    }
   }
 
   func saveLifecycleSnapshot(snapshot: LifecycleSnapshot) throws {
@@ -646,7 +665,6 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
       queue: .main
     ) { [weak self] _ in
       self?.secureSurfaceController.refreshIfEnabled()
-      self?.scheduleSecurityRefresh()
       self?.flutterApi.onForegroundStateChanged(active: true) { _ in }
     }
 
@@ -663,12 +681,15 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
     flutterApi.onScreenCaptureChanged(active: screenCaptureProvider()) { _ in }
   }
 
-  private func scheduleSecurityRefresh() {
-    detectorQueue.async { [weak self] in
-      guard let self else { return }
-      let signals = self.securityDetector.collectSignals()
-      DispatchQueue.main.async { [weak self] in
-        self?.advancedSignalsCache = signals
+  private func performStorage<T>(
+    completion: @escaping (Result<T, Error>) -> Void,
+    operation: @escaping (IosSecureStorageHelper) throws -> T
+  ) {
+    let helper = secureStorageHelper
+    storageQueue.async {
+      let result = Result { try operation(helper) }
+      DispatchQueue.main.async {
+        completion(result)
       }
     }
   }
