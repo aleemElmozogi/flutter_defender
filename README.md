@@ -24,7 +24,7 @@ There is no route-observer setup. A guarded screen protects itself before the se
 
 ```yaml
 dependencies:
-  flutter_defender: ^0.5.1
+  flutter_defender: ^0.6.0
 ```
 
 ### Android release emulator launch block
