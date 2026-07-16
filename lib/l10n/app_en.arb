@@ -1,6 +1,7 @@
 {
   "@@locale": "en",
   "blockingScreenTitle": "Security Policy",
+  "protectionUnavailable": "Security Policy: Native protection is temporarily unavailable.",
   "emulatorReleaseBlocked": "Security Policy: This app cannot run on emulators in release mode.",
   "screenshotsBlocked": "Security Policy: Screenshots are not allowed on sensitive screens.",
   "overlaysBlocked": "Security Policy: Screen overlays are not allowed while sensitive content is visible.",

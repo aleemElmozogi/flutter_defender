@@ -9,6 +9,7 @@ import android.view.Window
 internal class OverlayAwareWindowCallback(
     val delegateCallback: Window.Callback,
     private val onObscuredTouch: () -> Unit,
+    private val onWindowFocusChange: ((Boolean) -> Unit)? = null,
     private val isActive: () -> Boolean
 ) : Window.Callback by delegateCallback {
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
@@ -17,6 +18,13 @@ internal class OverlayAwareWindowCallback(
             return true
         }
         return delegateCallback.dispatchTouchEvent(event)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        if (isActive()) {
+            onWindowFocusChange?.invoke(hasFocus)
+        }
+        delegateCallback.onWindowFocusChanged(hasFocus)
     }
 }
 

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -54,6 +55,7 @@ class _PendingInitRequest {
     required this.enableRaspDetection,
     required this.enableSecureStorageHelper,
     required this.clearSecureStorageOnLogout,
+    required this.failClosedOnPlatformError,
     required this.blockingScreenBuilder,
     required this.onLogoutRequested,
     required this.onRootDetected,
@@ -75,6 +77,7 @@ class _PendingInitRequest {
   final bool enableRaspDetection;
   final bool enableSecureStorageHelper;
   final bool clearSecureStorageOnLogout;
+  final bool failClosedOnPlatformError;
   final Widget Function(String message)? blockingScreenBuilder;
   final VoidCallback? onLogoutRequested;
   final VoidCallback? onRootDetected;
@@ -88,6 +91,11 @@ class _PendingInitRequest {
   final Completer<void> completer;
 }
 
+/// Coordinates native protection, runtime policy, and active guard widgets.
+///
+/// Call [init] once before `runApp`, then wrap sensitive UI in one of the guard
+/// widgets. Calling [dispose] resets this singleton so it can be initialized
+/// again, which is useful for tests and engine restarts.
 class FlutterDefender with WidgetsBindingObserver implements Listenable {
   FlutterDefender._internal();
 
@@ -122,9 +130,20 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
   @visibleForTesting
   void debugResetNowProvider() => _nowProvider = DateTime.now;
 
+  /// Initializes the protection policy and restores any lifecycle snapshot.
+  ///
+  /// Advanced root detection defaults on only in release mode. Proxy/VPN and
+  /// RASP detection are explicit opt-ins. [onLogoutRequested] can run during
+  /// this future, before `runApp`, when a persisted background timeout has
+  /// expired, so the callback must be safe before navigator state exists.
+  ///
+  /// [pinBackgroundTimeoutSeconds] is a deprecated alias. When both timeout
+  /// names are supplied, [authenticatedBackgroundTimeoutSeconds] wins.
+  /// Set [failClosedOnPlatformError] to keep guarded content blocked whenever
+  /// required native protection or signal calls fail.
   Future<void> init({
     int otpBackgroundTimeoutSeconds = 60,
-    int authenticatedBackgroundTimeoutSeconds = 120,
+    int? authenticatedBackgroundTimeoutSeconds,
     @Deprecated(
       'Use authenticatedBackgroundTimeoutSeconds instead. '
       'This timeout applies to the authenticated session, not a specific PIN page.',
@@ -137,6 +156,7 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
     bool? enableRaspDetection,
     bool enableSecureStorageHelper = false,
     bool clearSecureStorageOnLogout = false,
+    bool failClosedOnPlatformError = false,
     Widget Function(String message)? blockingScreenBuilder,
     VoidCallback? onLogoutRequested,
     VoidCallback? onRootDetected,
@@ -149,7 +169,9 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
     String Function(BuildContext context)? blockingTitleResolver,
   }) {
     final int resolvedAuthenticatedBackgroundTimeoutSeconds =
-        pinBackgroundTimeoutSeconds ?? authenticatedBackgroundTimeoutSeconds;
+        authenticatedBackgroundTimeoutSeconds ??
+        pinBackgroundTimeoutSeconds ??
+        120;
     final bool releaseEnabledByDefault = kReleaseMode;
     final Completer<void> completer = Completer<void>();
     if (_pendingInitRequest != null &&
@@ -167,6 +189,7 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
       enableRaspDetection: enableRaspDetection ?? false,
       enableSecureStorageHelper: enableSecureStorageHelper,
       clearSecureStorageOnLogout: clearSecureStorageOnLogout,
+      failClosedOnPlatformError: failClosedOnPlatformError,
       blockingScreenBuilder: blockingScreenBuilder,
       onLogoutRequested: onLogoutRequested,
       onRootDetected: onRootDetected,
@@ -211,6 +234,7 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
             enableRaspDetection: request.enableRaspDetection,
             enableSecureStorageHelper: request.enableSecureStorageHelper,
             clearSecureStorageOnLogout: request.clearSecureStorageOnLogout,
+            failClosedOnPlatformError: request.failClosedOnPlatformError,
             blockingScreenBuilder: request.blockingScreenBuilder,
             onLogoutRequested: request.onLogoutRequested,
             onRootDetected: request.onRootDetected,
@@ -238,6 +262,7 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
     }
   }
 
+  /// Updates whether authenticated-session background timeout policy applies.
   void setAuthenticated(bool authenticated) {
     _runtime
       ..isAuthenticated = authenticated
@@ -259,6 +284,7 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
     );
   }
 
+  /// Writes a value using the optional native secure-storage helper.
   Future<void> secureWrite({required String key, required String value}) async {
     if (!_config.enableSecureStorageHelper) {
       throw StateError(
@@ -269,6 +295,7 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
     await _safeSecureWrite(key: key, value: value);
   }
 
+  /// Reads a value using the optional native secure-storage helper.
   Future<String?> secureRead(String key) async {
     if (!_config.enableSecureStorageHelper) {
       throw StateError(
@@ -279,6 +306,7 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
     return _safeSecureRead(key);
   }
 
+  /// Deletes one value from the optional native secure-storage helper.
   Future<void> secureDelete(String key) async {
     if (!_config.enableSecureStorageHelper) {
       throw StateError(
@@ -289,6 +317,7 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
     await _safeSecureDelete(key);
   }
 
+  /// Deletes every value owned by the native secure-storage helper.
   Future<void> secureClearAll() async {
     if (!_config.enableSecureStorageHelper) {
       throw StateError(
@@ -306,6 +335,7 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
   void removeListener(VoidCallback listener) =>
       _notifier.removeListener(listener);
 
+  /// Resets protection and lifecycle state while keeping the singleton reusable.
   void dispose() {
     if (_observerRegistered) {
       WidgetsBinding.instance.removeObserver(this);
@@ -314,7 +344,7 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
     _platform.setCallbacks(null);
     _activeGuards.clear();
     unawaited(
-      _platform.setProtectionState(
+      _safeSetProtectionState(
         secureActive: false,
         overlayHardeningActive: false,
       ),
@@ -336,13 +366,6 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
     switch (state) {
       case AppLifecycleState.inactive:
         _setInactivePrivacyShield(active: _shouldShieldOnInactive);
-        if (_runtime.pausedAtMs == null) {
-          final int nowMs = _nowProvider().millisecondsSinceEpoch;
-          _runtime
-            ..pausedAtMs = nowMs
-            ..logoutTriggeredForCurrentBackground = false;
-          unawaited(_persistLifecycleSnapshot(lastBackgroundedAtMs: nowMs));
-        }
         break;
       case AppLifecycleState.hidden:
         break;

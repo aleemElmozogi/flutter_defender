@@ -3,7 +3,6 @@ package aleem.flutter.defender
 import android.app.Activity
 import android.os.Build
 import android.util.Log
-import android.view.ViewTreeObserver
 import android.view.Window
 import android.view.WindowManager
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -25,21 +24,12 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
     private var secureStorageHelper: SecureStorageHelper? = null
     private var detectorExecutor: ExecutorService? = null
     private var screenCaptureCallbackHandle: Any? = null
-    private var windowFocusListener: ViewTreeObserver.OnWindowFocusChangeListener? = null
+    private var foregroundLifecycleTracker: ForegroundLifecycleTracker? = null
     private var windowCallbackWrapper: OverlayAwareWindowCallback? = null
     private var secureActive = false
     private var overlayHardeningActive = false
     private var hideOverlayWindowsAvailable = true
-    @Volatile
-    private var advancedSecuritySignalsCache = AdvancedSecuritySignals(
-        rootedOrJailbroken = false,
-        proxyEnabled = false,
-        vpnEnabled = false,
-        debuggerAttached = false,
-        tamperingDetected = false,
-        tamperingDetails = null
-    )
-
+    private var lastEmittedForegroundState: Boolean? = null
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         snapshotStore = LifecycleSnapshotStore(binding.applicationContext)
         advancedSecurityDetector = AdvancedSecurityDetector(binding.applicationContext)
@@ -47,19 +37,18 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
         detectorExecutor = Executors.newSingleThreadExecutor()
         flutterApi = DefenderFlutterApi(binding.binaryMessenger)
         DefenderHostApi.setUp(binding.binaryMessenger, this)
-        scheduleSecurityRefresh()
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         DefenderHostApi.setUp(binding.binaryMessenger, null)
         unregisterScreenCaptureCallback()
-        removeWindowFocusListener()
+        unregisterForegroundLifecycleTracker()
         restoreWindowCallback()
         flutterApi = null
         snapshotStore = null
         secureStorageHelper = null
         advancedSecurityDetector = null
-        detectorExecutor?.shutdownNow()
+        detectorExecutor?.shutdown()
         detectorExecutor = null
     }
 
@@ -81,9 +70,6 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
         this.secureActive = secureActive
         this.overlayHardeningActive = overlayHardeningActive
         applyProtectionState()
-        if (secureActive || overlayHardeningActive) {
-            scheduleSecurityRefresh()
-        }
     }
 
     override fun getRuntimeState(): NativeRuntimeState {
@@ -96,32 +82,36 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
         )
     }
 
-    override fun getAdvancedSecuritySignals(): AdvancedSecuritySignals {
-        return advancedSecuritySignalsCache
+    override fun getAdvancedSecuritySignals(
+        callback: (Result<AdvancedSecuritySignals>) -> Unit
+    ) {
+        val detector = advancedSecurityDetector
+            ?: return callback(Result.failure(IllegalStateException("Security detector is unavailable.")))
+        runOnWorker(callback) { detector.collectSignals() }
     }
 
-    override fun secureWrite(key: String, value: String) {
+    override fun secureWrite(key: String, value: String, callback: (Result<Unit>) -> Unit) {
         val helper = secureStorageHelper
-            ?: throw IllegalStateException("Secure storage is unavailable.")
-        helper.write(key, value)
+            ?: return callback(Result.failure(IllegalStateException("Secure storage is unavailable.")))
+        runOnWorker(callback) { helper.write(key, value) }
     }
 
-    override fun secureRead(key: String): String? {
+    override fun secureRead(key: String, callback: (Result<String?>) -> Unit) {
         val helper = secureStorageHelper
-            ?: throw IllegalStateException("Secure storage is unavailable.")
-        return helper.read(key)
+            ?: return callback(Result.failure(IllegalStateException("Secure storage is unavailable.")))
+        runOnWorker(callback) { helper.read(key) }
     }
 
-    override fun secureDelete(key: String) {
+    override fun secureDelete(key: String, callback: (Result<Unit>) -> Unit) {
         val helper = secureStorageHelper
-            ?: throw IllegalStateException("Secure storage is unavailable.")
-        helper.delete(key)
+            ?: return callback(Result.failure(IllegalStateException("Secure storage is unavailable.")))
+        runOnWorker(callback) { helper.delete(key) }
     }
 
-    override fun secureClearAll() {
+    override fun secureClearAll(callback: (Result<Unit>) -> Unit) {
         val helper = secureStorageHelper
-            ?: throw IllegalStateException("Secure storage is unavailable.")
-        helper.clearAll()
+            ?: return callback(Result.failure(IllegalStateException("Secure storage is unavailable.")))
+        runOnWorker(callback) { helper.clearAll() }
     }
 
     override fun saveLifecycleSnapshot(snapshot: LifecycleSnapshot) {
@@ -137,16 +127,15 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
     }
 
     private fun rebindActivityHooks() {
+        registerForegroundLifecycleTracker()
         registerScreenCaptureCallback()
-        installWindowFocusListener()
         applyProtectionState()
         emitForegroundState(currentForegroundState())
-        scheduleSecurityRefresh()
     }
 
     private fun releaseActivity() {
         unregisterScreenCaptureCallback()
-        removeWindowFocusListener()
+        unregisterForegroundLifecycleTracker()
         restoreWindowCallback()
         activity = null
     }
@@ -192,10 +181,12 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
         val wrapper = OverlayAwareWindowCallback(
             delegateCallback = callback,
             onObscuredTouch = { emitOverlayViolation() },
+            onWindowFocusChange = ::emitWindowFocusState,
             isActive = { overlayHardeningActive }
         )
         window.callback = wrapper
         windowCallbackWrapper = wrapper
+        emitWindowFocusState(window.decorView.hasWindowFocus())
     }
 
     private fun restoreWindowCallback() {
@@ -235,52 +226,51 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
         screenCaptureCallbackHandle = null
     }
 
-    private fun installWindowFocusListener() {
+    private fun registerForegroundLifecycleTracker() {
         val activeActivity = activity ?: return
-        if (windowFocusListener != null) {
+        if (foregroundLifecycleTracker != null) {
             return
         }
-        val listener = ViewTreeObserver.OnWindowFocusChangeListener { hasFocus ->
-            emitForegroundState(hasFocus)
-        }
-        activeActivity.window.decorView.viewTreeObserver.addOnWindowFocusChangeListener(listener)
-        windowFocusListener = listener
+        val tracker = ForegroundLifecycleTracker(
+            targetActivity = { activity },
+            onForegroundChanged = ::emitForegroundState
+        )
+        activeActivity.application.registerActivityLifecycleCallbacks(tracker)
+        foregroundLifecycleTracker = tracker
     }
 
-    private fun removeWindowFocusListener() {
+    private fun unregisterForegroundLifecycleTracker() {
         val activeActivity = activity ?: return
-        val listener = windowFocusListener ?: return
-        val observer = activeActivity.window.decorView.viewTreeObserver
-        if (observer.isAlive) {
-            observer.removeOnWindowFocusChangeListener(listener)
-        }
-        windowFocusListener = null
+        val tracker = foregroundLifecycleTracker ?: return
+        activeActivity.application.unregisterActivityLifecycleCallbacks(tracker)
+        foregroundLifecycleTracker = null
     }
 
     private fun emitOverlayViolation() = flutterApi?.onOverlayViolation {}
 
     private fun emitForegroundState(active: Boolean) {
+        if (lastEmittedForegroundState == active) return
+        lastEmittedForegroundState = active
         flutterApi?.onForegroundStateChanged(active) {}
+    }
+
+    private fun emitWindowFocusState(hasFocus: Boolean) {
+        flutterApi?.onWindowFocusChanged(hasFocus) {}
     }
 
     private fun currentForegroundState(): Boolean {
         val activeActivity = activity ?: return true
-        return !activeActivity.isFinishing && activeActivity.hasWindowFocus()
+        return foregroundLifecycleTracker?.isForeground
+            ?: (!activeActivity.isFinishing && !activeActivity.isDestroyed)
     }
 
-    private fun scheduleSecurityRefresh() {
-        val detector = advancedSecurityDetector ?: return
-        val executor = detectorExecutor ?: return
+    private fun <T> runOnWorker(callback: (Result<T>) -> Unit, operation: () -> T) {
+        val executor = detectorExecutor
+            ?: return callback(Result.failure(IllegalStateException("Background worker is unavailable.")))
         try {
-            executor.execute {
-                try {
-                    advancedSecuritySignalsCache = detector.collectSignals()
-                } catch (error: Throwable) {
-                    Log.w(TAG, "Advanced security signal refresh failed.", error)
-                }
-            }
+            executor.execute { callback(runCatching(operation)) }
         } catch (error: RejectedExecutionException) {
-            Log.w(TAG, "Advanced security signal refresh was rejected.", error)
+            callback(Result.failure(error))
         }
     }
 }

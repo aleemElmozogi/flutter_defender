@@ -209,6 +209,8 @@ String _resolveBlockingMessage(
   FlutterDefenderMessageId id,
 ) {
   return switch (id) {
+    FlutterDefenderMessageId.protectionUnavailable =>
+      'Resolver demo: native protection is temporarily unavailable.',
     FlutterDefenderMessageId.emulatorReleaseBlocked =>
       'Resolver demo: release builds are intentionally blocked on emulators.',
     FlutterDefenderMessageId.screenshotsBlocked =>

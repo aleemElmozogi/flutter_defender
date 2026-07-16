@@ -42,14 +42,19 @@ abstract class DefenderHostApi {
 
   NativeRuntimeState getRuntimeState();
 
+  @async
   AdvancedSecuritySignals getAdvancedSecuritySignals();
 
+  @async
   void secureWrite(String key, String value);
 
+  @async
   String? secureRead(String key);
 
+  @async
   void secureDelete(String key);
 
+  @async
   void secureClearAll();
 
   void saveLifecycleSnapshot(LifecycleSnapshot snapshot);
@@ -68,4 +73,6 @@ abstract class DefenderFlutterApi {
   void onOverlayViolation();
 
   void onForegroundStateChanged(bool active);
+
+  void onWindowFocusChanged(bool hasFocus);
 }

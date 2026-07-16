@@ -31,7 +31,9 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
       }
     }
 
-    _runtime.overlayViolationActive = false;
+    _runtime
+      ..overlayViolationActive = false
+      ..windowFocusConcealActive = false;
     await _syncProtection(concealUntilProtectionReady: false);
   }
 
@@ -96,6 +98,8 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
         _runtime.nativeProtectionActive = false;
       }
       _runtime
+        ..platformUnavailableBlocked = false
+        ..windowFocusConcealActive = false
         ..rootBlocked = false
         ..proxyOrVpnBlocked = false
         ..tamperingBlocked = false;
@@ -112,30 +116,46 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
       _notifyListeners();
     }
 
-    await _safeSetProtectionState(
+    final bool protectionStateSucceeded = await _safeSetProtectionState(
       secureActive: hasGuards,
       overlayHardeningActive: hasGuards,
     );
     if (generation != _syncGeneration) {
       return;
     }
-    _runtime.nativeProtectionActive = hasGuards;
+    _runtime.nativeProtectionActive = hasGuards && protectionStateSucceeded;
 
-    final pigeon.NativeRuntimeState runtimeState = await _safeGetRuntimeState();
+    final bool advancedDetectionEnabled =
+        hasGuards &&
+        (_config.enableRootDetection ||
+            _config.enableProxyVpnDetection ||
+            _config.enableRaspDetection);
+    final Future<_PlatformResult<pigeon.NativeRuntimeState>>
+    runtimeStateFuture = _safeGetRuntimeState();
+    final Future<_PlatformResult<pigeon.AdvancedSecuritySignals>?>
+    advancedSignalsFuture = advancedDetectionEnabled
+        ? _safeGetAdvancedSecuritySignals().then(
+            (_PlatformResult<pigeon.AdvancedSecuritySignals> result) => result,
+          )
+        : Future<_PlatformResult<pigeon.AdvancedSecuritySignals>?>.value();
+    final (
+      _PlatformResult<pigeon.NativeRuntimeState> runtimeStateResult,
+      _PlatformResult<pigeon.AdvancedSecuritySignals>? advancedSignalsResult,
+    ) = await (
+      runtimeStateFuture,
+      advancedSignalsFuture,
+    ).wait;
     if (generation != _syncGeneration) {
       return;
     }
-    _applyRuntimeState(runtimeState);
-    if (hasGuards &&
-        (_config.enableRootDetection ||
-            _config.enableProxyVpnDetection ||
-            _config.enableRaspDetection)) {
-      final pigeon.AdvancedSecuritySignals signals =
-          await _safeGetAdvancedSecuritySignals();
-      if (generation != _syncGeneration) {
-        return;
-      }
-      _applyAdvancedSecuritySignals(signals);
+    _runtime.platformUnavailableBlocked =
+        _config.failClosedOnPlatformError &&
+        (!protectionStateSucceeded ||
+            !runtimeStateResult.succeeded ||
+            advancedSignalsResult?.succeeded == false);
+    _applyRuntimeState(runtimeStateResult.value);
+    if (advancedSignalsResult != null) {
+      _applyAdvancedSecuritySignals(advancedSignalsResult.value);
     } else {
       _runtime
         ..rootBlocked = false
@@ -198,6 +218,7 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
       return;
     }
     _showTemporaryBlocking(FlutterDefenderMessageId.screenshotsBlocked);
+    _notifyListeners();
   }
 
   void _handleScreenCaptureChanged(bool active) {
@@ -218,11 +239,26 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
     _notifyListeners();
   }
 
+  /// Focus-only interruptions (for example a biometric prompt window over a
+  /// guarded screen) conceal guarded content but never start background
+  /// timeouts or the foreground blocking screen; those remain tied to actual
+  /// activity pause/resume signals.
+  void _handleWindowFocusChanged(bool hasFocus) {
+    final bool concealActive = !hasFocus && _activeGuards.isNotEmpty;
+    if (_runtime.windowFocusConcealActive == concealActive) {
+      return;
+    }
+    _runtime.windowFocusConcealActive = concealActive;
+    _notifyListeners();
+  }
+
   void _handleForegroundStateChanged(bool active) {
     final bool wasForeground = _runtime.isForeground;
     _runtime.isForeground = active;
     if (active) {
-      _runtime.overlayViolationActive = false;
+      _runtime
+        ..overlayViolationActive = false
+        ..windowFocusConcealActive = false;
       unawaited(_handleAppResumed());
       return;
     }

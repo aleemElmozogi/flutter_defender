@@ -14,6 +14,7 @@ class FlutterDefenderConfig {
     this.enableRaspDetection = false,
     this.enableSecureStorageHelper = false,
     this.clearSecureStorageOnLogout = false,
+    this.failClosedOnPlatformError = false,
     this.blockingScreenBuilder,
     this.onLogoutRequested,
     this.onRootDetected,
@@ -35,6 +36,7 @@ class FlutterDefenderConfig {
     required bool enableRaspDetection,
     required bool enableSecureStorageHelper,
     required bool clearSecureStorageOnLogout,
+    required bool failClosedOnPlatformError,
     required Widget Function(String message)? blockingScreenBuilder,
     required VoidCallback? onLogoutRequested,
     required VoidCallback? onRootDetected,
@@ -65,6 +67,7 @@ class FlutterDefenderConfig {
       enableRaspDetection: enableRaspDetection,
       enableSecureStorageHelper: enableSecureStorageHelper,
       clearSecureStorageOnLogout: clearSecureStorageOnLogout,
+      failClosedOnPlatformError: failClosedOnPlatformError,
       blockingScreenBuilder: blockingScreenBuilder,
       onLogoutRequested: onLogoutRequested,
       onRootDetected: onRootDetected,
@@ -86,6 +89,7 @@ class FlutterDefenderConfig {
   final bool enableRaspDetection;
   final bool enableSecureStorageHelper;
   final bool clearSecureStorageOnLogout;
+  final bool failClosedOnPlatformError;
   final Widget Function(String message)? blockingScreenBuilder;
   final VoidCallback? onLogoutRequested;
   final VoidCallback? onRootDetected;

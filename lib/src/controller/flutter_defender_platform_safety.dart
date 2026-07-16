@@ -1,7 +1,12 @@
 part of '../../flutter_defender.dart';
 
+NativeDefenderSignals _collectNativeSignals() =>
+    FlutterDefenderNative.instance.collectSignals();
+
+typedef _PlatformResult<T> = ({T value, bool succeeded});
+
 extension _FlutterDefenderPlatformSafety on FlutterDefender {
-  Future<void> _safeSetProtectionState({
+  Future<bool> _safeSetProtectionState({
     required bool secureActive,
     required bool overlayHardeningActive,
   }) async {
@@ -10,52 +15,84 @@ extension _FlutterDefenderPlatformSafety on FlutterDefender {
         secureActive: secureActive,
         overlayHardeningActive: overlayHardeningActive,
       );
+      return true;
     } catch (_) {
       // Best-effort native hardening should never crash the host app.
+      return false;
     }
   }
 
-  Future<pigeon.NativeRuntimeState> _safeGetRuntimeState() async {
+  Future<_PlatformResult<pigeon.NativeRuntimeState>>
+  _safeGetRuntimeState() async {
     final bool nativeEmulatorDetected = FlutterDefenderNative.instance
         .detectEmulator();
     try {
       final pigeon.NativeRuntimeState runtimeState = await _platform
           .getRuntimeState();
-      return pigeon.NativeRuntimeState(
-        isForeground: runtimeState.isForeground,
-        isScreenCaptured: runtimeState.isScreenCaptured,
-        isEmulator:
-            (runtimeState.isEmulator ?? false) || nativeEmulatorDetected,
-        supportsOverlayHardening: runtimeState.supportsOverlayHardening,
+      return (
+        value: pigeon.NativeRuntimeState(
+          isForeground: runtimeState.isForeground,
+          isScreenCaptured: runtimeState.isScreenCaptured,
+          isEmulator:
+              (runtimeState.isEmulator ?? false) || nativeEmulatorDetected,
+          supportsOverlayHardening: runtimeState.supportsOverlayHardening,
+        ),
+        succeeded: true,
       );
     } catch (_) {
-      return pigeon.NativeRuntimeState(
-        isForeground: true,
-        isScreenCaptured: false,
-        isEmulator: nativeEmulatorDetected,
-        supportsOverlayHardening: false,
+      return (
+        value: pigeon.NativeRuntimeState(
+          isForeground: true,
+          isScreenCaptured: false,
+          isEmulator: nativeEmulatorDetected,
+          supportsOverlayHardening: false,
+        ),
+        succeeded: false,
       );
     }
   }
 
-  Future<pigeon.AdvancedSecuritySignals>
+  Future<_PlatformResult<pigeon.AdvancedSecuritySignals>>
   _safeGetAdvancedSecuritySignals() async {
-    final NativeDefenderSignals nativeSignals = FlutterDefenderNative.instance
-        .collectSignals();
-    try {
-      final pigeon.AdvancedSecuritySignals signals = await _platform
-          .getAdvancedSecuritySignals();
-      return _mergeNativeSecuritySignals(signals, nativeSignals);
-    } catch (_) {
-      return pigeon.AdvancedSecuritySignals(
+    final Future<NativeDefenderSignals> nativeSignalsFuture =
+        Isolate.run<NativeDefenderSignals>(_collectNativeSignals).onError(
+          (Object _, StackTrace _) => const NativeDefenderSignals.unavailable(),
+        );
+    final Future<_PlatformResult<pigeon.AdvancedSecuritySignals?>>
+    platformSignalsFuture = _platform
+        .getAdvancedSecuritySignals()
+        .then<_PlatformResult<pigeon.AdvancedSecuritySignals?>>(
+          (pigeon.AdvancedSecuritySignals signals) =>
+              (value: signals, succeeded: true),
+        )
+        .onError((Object _, StackTrace _) => (value: null, succeeded: false));
+    final (
+      NativeDefenderSignals nativeSignals,
+      _PlatformResult<pigeon.AdvancedSecuritySignals?> platformResult,
+    ) = await (
+      nativeSignalsFuture,
+      platformSignalsFuture,
+    ).wait;
+
+    final pigeon.AdvancedSecuritySignals? platformSignals =
+        platformResult.value;
+    if (platformSignals != null) {
+      return (
+        value: _mergeNativeSecuritySignals(platformSignals, nativeSignals),
+        succeeded: platformResult.succeeded,
+      );
+    }
+    return (
+      value: pigeon.AdvancedSecuritySignals(
         rootedOrJailbroken: nativeSignals.rootedOrJailbroken,
         proxyEnabled: false,
         vpnEnabled: false,
         debuggerAttached: nativeSignals.debuggerAttached,
         tamperingDetected: nativeSignals.tamperingDetected,
         tamperingDetails: _nativeTamperingDetails(nativeSignals),
-      );
-    }
+      ),
+      succeeded: platformResult.succeeded,
+    );
   }
 
   pigeon.AdvancedSecuritySignals _mergeNativeSecuritySignals(
