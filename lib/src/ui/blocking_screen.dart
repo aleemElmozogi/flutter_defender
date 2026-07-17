@@ -24,34 +24,53 @@ class BlockingScreen extends StatelessWidget {
     return ColoredBox(
       color: t.backgroundColor,
       child: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: t.horizontalPadding),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: t.cardColor,
-                    borderRadius: BorderRadius.circular(t.logoCardBorderRadius),
-                    border: Border.all(color: t.cardBorderColor),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(t.cardPadding),
-                    child: t.headerLogo,
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            return SingleChildScrollView(
+              primary: false,
+              padding: EdgeInsets.symmetric(horizontal: t.horizontalPadding),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.hasBoundedHeight
+                      ? constraints.maxHeight
+                      : 0,
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: t.cardColor,
+                          borderRadius: BorderRadius.circular(
+                            t.logoCardBorderRadius,
+                          ),
+                          border: Border.all(color: t.cardBorderColor),
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.all(t.cardPadding),
+                          child: t.headerLogo,
+                        ),
+                      ),
+                      SizedBox(height: t.spacingBelowLogoCard),
+                      Text(
+                        title ??
+                            FlutterDefenderMessages.blockingTitleFor(context),
+                        textAlign: TextAlign.center,
+                        style: t.titleStyle,
+                      ),
+                      SizedBox(height: t.spacingBelowTitle),
+                      Text(
+                        message,
+                        textAlign: TextAlign.center,
+                        style: t.bodyStyle,
+                      ),
+                    ],
                   ),
                 ),
-                SizedBox(height: t.spacingBelowLogoCard),
-                Text(
-                  title ?? FlutterDefenderMessages.blockingTitleFor(context),
-                  textAlign: TextAlign.center,
-                  style: t.titleStyle,
-                ),
-                SizedBox(height: t.spacingBelowTitle),
-                Text(message, textAlign: TextAlign.center, style: t.bodyStyle),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
       ),
     );

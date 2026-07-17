@@ -41,26 +41,27 @@ extension _FlutterDefenderBlockingUi on FlutterDefender {
         fit: StackFit.expand,
         children: <Widget>[
           const ModalBarrier(dismissible: false, color: Colors.transparent),
-          AbsorbPointer(
-            absorbing: true,
-            child: Builder(
-              builder: (BuildContext innerContext) {
-                final String message = _resolveBlockingMessage(
-                  innerContext,
-                  messageId,
-                );
-                final String? explicitTitle =
-                    _config.blockingTitleResolver != null
-                    ? _resolveBlockingTitle(innerContext)
-                    : null;
-                return _config.blockingScreenBuilder?.call(message) ??
-                    BlockingScreen(
-                      title: explicitTitle,
-                      message: message,
-                      theme: _config.uiTheme,
-                    );
-              },
-            ),
+          Builder(
+            builder: (BuildContext innerContext) {
+              final String message = _resolveBlockingMessage(
+                innerContext,
+                messageId,
+              );
+              final Widget Function(String message)? customBuilder =
+                  _config.blockingScreenBuilder;
+              if (customBuilder != null) {
+                return AbsorbPointer(child: customBuilder(message));
+              }
+              final String? explicitTitle =
+                  _config.blockingTitleResolver != null
+                  ? _resolveBlockingTitle(innerContext)
+                  : null;
+              return BlockingScreen(
+                title: explicitTitle,
+                message: message,
+                theme: _config.uiTheme,
+              );
+            },
           ),
         ],
       ),

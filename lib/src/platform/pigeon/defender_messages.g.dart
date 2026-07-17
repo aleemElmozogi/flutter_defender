@@ -558,6 +558,8 @@ abstract class DefenderFlutterApi {
 
   void onOverlayViolation();
 
+  void onOverlayCleared();
+
   void onForegroundStateChanged(bool active);
 
   void onWindowFocusChanged(bool hasFocus);
@@ -630,6 +632,29 @@ abstract class DefenderFlutterApi {
         pigeonVar_channel.setMessageHandler((Object? message) async {
           try {
             api.onOverlayViolation();
+            return wrapResponse(empty: true);
+          } on PlatformException catch (e) {
+            return wrapResponse(error: e);
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
+          }
+        });
+      }
+    }
+    {
+      final pigeonVar_channel = BasicMessageChannel<Object?>(
+        'dev.flutter.pigeon.flutter_defender.DefenderFlutterApi.onOverlayCleared$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
+      if (api == null) {
+        pigeonVar_channel.setMessageHandler(null);
+      } else {
+        pigeonVar_channel.setMessageHandler((Object? message) async {
+          try {
+            api.onOverlayCleared();
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);

@@ -239,6 +239,15 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
     _notifyListeners();
   }
 
+  void _handleOverlayCleared() {
+    if (!_runtime.overlayViolationActive) {
+      return;
+    }
+    _runtime.overlayViolationActive = false;
+    _recomputeBlockingState();
+    _notifyListeners();
+  }
+
   /// Focus-only interruptions (for example a biometric prompt window over a
   /// guarded screen) conceal guarded content but never start background
   /// timeouts or the foreground blocking screen; those remain tied to actual

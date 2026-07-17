@@ -154,6 +154,10 @@ class FakeFlutterDefenderPlatform
     callbacks?.onOverlayViolation?.call();
   }
 
+  void emitOverlayCleared() {
+    callbacks?.onOverlayCleared?.call();
+  }
+
   void emitForegroundStateChanged(bool active) {
     callbacks?.onForegroundStateChanged?.call(active);
   }
@@ -383,6 +387,100 @@ void main() {
     );
   });
 
+  testWidgets('overlay violation recovers without unregistering the guard', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init(
+      blockingScreenBuilder: (String message) => Center(child: Text(message)),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates:
+            FlutterDefenderLocalizations.localizationsDelegates,
+        supportedLocales: FlutterDefenderLocalizations.supportedLocales,
+        home: const FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secure')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    fakePlatform.emitOverlayViolation();
+    await tester.pump();
+
+    expect(defender.hasBlockingOverlay, isTrue);
+    expect(
+      find.text(
+        FlutterDefenderMessages.stringFor(
+          FlutterDefenderMessageId.overlaysBlocked,
+        ),
+      ),
+      findsOneWidget,
+    );
+
+    fakePlatform.emitOverlayCleared();
+    await tester.pump();
+
+    expect(defender.hasBlockingOverlay, isFalse);
+    expect(
+      find.text(
+        FlutterDefenderMessages.stringFor(
+          FlutterDefenderMessageId.overlaysBlocked,
+        ),
+      ),
+      findsNothing,
+    );
+    expect(find.text('secure'), findsOneWidget);
+  });
+
+  testWidgets('default blocking overlay scrolls in constrained guards', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init();
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: FlutterDefenderSensitiveGuard(
+          child: Scaffold(
+            body: ColoredBox(
+              color: Colors.white,
+              child: Center(child: Text('secure')),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    fakePlatform.emitOverlayViolation();
+    await tester.pumpAndSettle();
+
+    expect(defender.hasBlockingOverlay, isTrue);
+    expect(tester.takeException(), isNull);
+    final Finder scrollableFinder = find.descendant(
+      of: find.byType(BlockingScreen),
+      matching: find.byType(Scrollable),
+    );
+    final ScrollPosition position = tester
+        .state<ScrollableState>(scrollableFinder)
+        .position;
+    expect(position.maxScrollExtent, greaterThan(0));
+    final Finder hitTestableScrollable = scrollableFinder.hitTestable();
+    expect(hitTestableScrollable, findsOneWidget);
+
+    await tester.drag(hitTestableScrollable, const Offset(0, -80));
+    await tester.pumpAndSettle();
+
+    expect(position.pixels, greaterThan(0));
+  });
+
   testWidgets('foreground message appears for an actual background signal', (
     WidgetTester tester,
   ) async {
@@ -470,6 +568,10 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('tap me'), findsOneWidget);
+
+    await tester.tap(find.text('tap me'), warnIfMissed: false);
+    await tester.pump();
+
     expect(tapped, 0);
   });
 

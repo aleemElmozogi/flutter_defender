@@ -562,6 +562,7 @@ protocol DefenderFlutterApiProtocol {
   func onScreenshotDetected(completion: @escaping (Result<Void, PigeonError>) -> Void)
   func onScreenCaptureChanged(active activeArg: Bool, completion: @escaping (Result<Void, PigeonError>) -> Void)
   func onOverlayViolation(completion: @escaping (Result<Void, PigeonError>) -> Void)
+  func onOverlayCleared(completion: @escaping (Result<Void, PigeonError>) -> Void)
   func onForegroundStateChanged(active activeArg: Bool, completion: @escaping (Result<Void, PigeonError>) -> Void)
   func onWindowFocusChanged(hasFocus hasFocusArg: Bool, completion: @escaping (Result<Void, PigeonError>) -> Void)
 }
@@ -613,6 +614,24 @@ class DefenderFlutterApi: DefenderFlutterApiProtocol {
   }
   func onOverlayViolation(completion: @escaping (Result<Void, PigeonError>) -> Void) {
     let channelName: String = "dev.flutter.pigeon.flutter_defender.DefenderFlutterApi.onOverlayViolation\(messageChannelSuffix)"
+    let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
+    channel.sendMessage(nil) { response in
+      guard let listResponse = response as? [Any?] else {
+        completion(.failure(createConnectionError(withChannelName: channelName)))
+        return
+      }
+      if listResponse.count > 1 {
+        let code: String = listResponse[0] as! String
+        let message: String? = nilOrValue(listResponse[1])
+        let details: String? = nilOrValue(listResponse[2])
+        completion(.failure(PigeonError(code: code, message: message, details: details)))
+      } else {
+        completion(.success(()))
+      }
+    }
+  }
+  func onOverlayCleared(completion: @escaping (Result<Void, PigeonError>) -> Void) {
+    let channelName: String = "dev.flutter.pigeon.flutter_defender.DefenderFlutterApi.onOverlayCleared\(messageChannelSuffix)"
     let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
     channel.sendMessage(nil) { response in
       guard let listResponse = response as? [Any?] else {

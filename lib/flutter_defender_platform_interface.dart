@@ -11,6 +11,7 @@ class FlutterDefenderPlatformCallbacks {
     this.onScreenshotDetected,
     this.onScreenCaptureChanged,
     this.onOverlayViolation,
+    this.onOverlayCleared,
     this.onForegroundStateChanged,
     this.onWindowFocusChanged,
   });
@@ -18,6 +19,7 @@ class FlutterDefenderPlatformCallbacks {
   final VoidCallback? onScreenshotDetected;
   final FlutterDefenderBoolCallback? onScreenCaptureChanged;
   final VoidCallback? onOverlayViolation;
+  final VoidCallback? onOverlayCleared;
   final FlutterDefenderBoolCallback? onForegroundStateChanged;
 
   /// Focus-only interruptions reported while a guard is active, such as a

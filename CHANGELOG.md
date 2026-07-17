@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-07-17
+
+### Fixed
+
+- Android overlay protection now clears a transient obscured-touch violation after the native window confirms an unobscured touch, so guarded content no longer remains blocked until its guard is closed and reopened. Confirmed obscured touches remain blocked.
+- Full Android obscuration still blocks immediately, while transient partial obscuration from trusted system UI such as camera privacy indicators is silently rejected and escalates only if it remains present on a later gesture beyond the confirmation window.
+- The default blocking screen now scrolls within short or otherwise constrained guards instead of overflowing vertically.
+
+### Tests
+
+- Added native and Flutter regressions for overlay-violation recovery, camera privacy indicator handling, persistent partial obscuration, and constrained blocking-screen layout.
+
 ## [0.6.0] - 2026-07-15
 
 ### Changed
