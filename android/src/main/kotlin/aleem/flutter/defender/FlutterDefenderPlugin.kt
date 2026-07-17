@@ -181,6 +181,7 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
         val wrapper = OverlayAwareWindowCallback(
             delegateCallback = callback,
             onObscuredTouch = { emitOverlayViolation() },
+            onUnobscuredTouch = { emitOverlayCleared() },
             onWindowFocusChange = ::emitWindowFocusState,
             isActive = { overlayHardeningActive }
         )
@@ -247,6 +248,8 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
     }
 
     private fun emitOverlayViolation() = flutterApi?.onOverlayViolation {}
+
+    private fun emitOverlayCleared() = flutterApi?.onOverlayCleared {}
 
     private fun emitForegroundState(active: Boolean) {
         if (lastEmittedForegroundState == active) return

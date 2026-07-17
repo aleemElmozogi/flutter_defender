@@ -180,31 +180,36 @@ abstract class _FlutterDefenderGuardState<T extends StatefulWidget>
             (!_registrationReady ||
                 defender.shouldConcealGuardedContent ||
                 defender.hasBlockingOverlay);
-        final Widget protectedChild = ExcludeSemantics(
-          excluding: concealContent,
-          child: Opacity(opacity: concealContent ? 0 : 1, child: guardedChild),
+        final Widget protectedChild = AbsorbPointer(
+          absorbing: concealContent,
+          child: ExcludeSemantics(
+            excluding: concealContent,
+            child: Opacity(
+              opacity: concealContent ? 0 : 1,
+              child: guardedChild,
+            ),
+          ),
         );
         final bool showPlaceholder =
             concealContent &&
             (!showsBlockingOverlay || !defender.hasBlockingOverlay);
-        return AbsorbPointer(
-          absorbing: concealContent,
-          child: Stack(
-            fit: StackFit.passthrough,
-            children: <Widget>[
-              protectedChild,
-              if (showPlaceholder)
-                Positioned.fill(
+        return Stack(
+          fit: StackFit.passthrough,
+          children: <Widget>[
+            protectedChild,
+            if (showPlaceholder)
+              Positioned.fill(
+                child: AbsorbPointer(
                   child: defender.buildConcealmentPlaceholder(
                     context,
                     compact: !showsBlockingOverlay,
                     builder: concealmentBuilder,
                   ),
                 ),
-              if (showsBlockingOverlay && defender.hasBlockingOverlay)
-                Positioned.fill(child: defender.buildBlockingOverlay(context)),
-            ],
-          ),
+              ),
+            if (showsBlockingOverlay && defender.hasBlockingOverlay)
+              Positioned.fill(child: defender.buildBlockingOverlay(context)),
+          ],
         );
       },
     );

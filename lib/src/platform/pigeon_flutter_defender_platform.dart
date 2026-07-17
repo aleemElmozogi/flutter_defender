@@ -17,6 +17,11 @@ class _DefenderFlutterApiAdapter extends DefenderFlutterApi {
   }
 
   @override
+  void onOverlayCleared() {
+    _callbacks.onOverlayCleared?.call();
+  }
+
+  @override
   void onScreenCaptureChanged(bool active) {
     _callbacks.onScreenCaptureChanged?.call(active);
   }

@@ -53,6 +53,7 @@ extension _FlutterDefenderInit on FlutterDefender {
           onScreenshotDetected: _handleScreenshotDetected,
           onScreenCaptureChanged: _handleScreenCaptureChanged,
           onOverlayViolation: _handleOverlayViolation,
+          onOverlayCleared: _handleOverlayCleared,
           onForegroundStateChanged: _handleForegroundStateChanged,
           onWindowFocusChanged: _handleWindowFocusChanged,
         ),
