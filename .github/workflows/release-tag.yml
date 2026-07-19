@@ -1,4 +1,4 @@
-name: Release Tag
+name: Release to pub.dev
 
 on:
   push:
@@ -12,11 +12,15 @@ concurrency:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   verify-and-tag:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    environment:
+      name: pub.dev
+      url: https://pub.dev/packages/flutter_defender
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -72,8 +76,29 @@ jobs:
           fi
           echo "value=$version" >> "$GITHUB_OUTPUT"
 
-      - name: Verify version bump
+      - name: Check whether version is already published
+        id: release_status
+        env:
+          PACKAGE_VERSION: ${{ steps.current_version.outputs.value }}
         run: |
+          if curl --fail --silent --show-error \
+            "https://pub.dev/api/packages/flutter_defender/versions/${PACKAGE_VERSION}" \
+            >/dev/null 2>&1; then
+            echo "Version ${PACKAGE_VERSION} is already published; no release is needed."
+            echo "required=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Version ${PACKAGE_VERSION} is not published yet."
+            echo "required=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify version bump
+        if: steps.release_status.outputs.required == 'true'
+        run: |
+          tag="v${{ steps.current_version.outputs.value }}"
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "Existing release tag $tag found; skipping previous-version comparison."
+            exit 0
+          fi
           before_sha="${{ github.event.before }}"
           if [ "$before_sha" = "0000000000000000000000000000000000000000" ]; then
             echo "Initial branch push detected; skipping previous-version comparison."
@@ -83,25 +108,34 @@ jobs:
           git show "${before_sha}:pubspec.yaml" > /tmp/previous-pubspec.yaml
           python3 tool/check_version_bump.py /tmp/previous-pubspec.yaml pubspec.yaml
 
-      - name: Ensure release tag does not already exist
+      - name: Verify or create release tag
+        if: steps.release_status.outputs.required == 'true'
         run: |
           tag="v${{ steps.current_version.outputs.value }}"
           if git rev-parse "$tag" >/dev/null 2>&1; then
-            echo "Tag $tag already exists." >&2
-            exit 1
+            tagged_sha=$(git rev-list -n 1 "$tag")
+            echo "Tag $tag already points to release commit $tagged_sha."
+            exit 0
           fi
-
-      - name: Create and push release tag
-        env:
-          RELEASE_TAG_TOKEN: ${{ secrets.RELEASE_TAG_TOKEN }}
-        run: |
-          if [ -z "$RELEASE_TAG_TOKEN" ]; then
-            echo "Missing RELEASE_TAG_TOKEN secret. Create a fine-grained PAT with Contents: Read and write so tag pushes can trigger the publish workflow." >&2
-            exit 1
-          fi
-
-          tag="v${{ steps.current_version.outputs.value }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag "$tag" "$GITHUB_SHA"
-          git push "https://x-access-token:${RELEASE_TAG_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$tag"
+          git push origin "$tag"
+
+      - name: Set up Dart publishing credentials
+        if: steps.release_status.outputs.required == 'true'
+        uses: dart-lang/setup-dart@v1
+
+      - name: Check out tagged release
+        if: steps.release_status.outputs.required == 'true'
+        run: |
+          git checkout "v${{ steps.current_version.outputs.value }}"
+          git checkout "$GITHUB_SHA" -- .pubignore
+
+      - name: Verify package is ready to publish
+        if: steps.release_status.outputs.required == 'true'
+        run: flutter pub publish --dry-run
+
+      - name: Publish package
+        if: steps.release_status.outputs.required == 'true'
+        run: flutter pub publish --force
