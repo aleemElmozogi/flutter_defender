@@ -1,0 +1,78 @@
+name: Publish to pub.dev
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Verify tag matches package version
+        run: |
+          version=$(grep '^version:' pubspec.yaml | sed 's/^version:[[:space:]]*//')
+          test "$GITHUB_REF_NAME" = "v${version}"
+
+      - name: Verify release metadata
+        run: python3 tool/check_version_bump.py --check-current pubspec.yaml
+
+      - name: Verify Android root-indicator parity
+        run: python3 tool/check_android_root_path_parity.py
+
+      - name: Analyze package
+        run: flutter analyze
+
+      - name: Run package tests
+        run: flutter test
+
+      - name: Run native HMAC-SHA256 known-answer tests
+        run: |
+          c++ -std=c++17 -Wall -Wextra -Werror \
+            -I src/native/include \
+            src/native/src/crypto/defender_crypto.cpp \
+            test/native/defender_crypto_test.cpp \
+            -o /tmp/flutter_defender_crypto_test
+          /tmp/flutter_defender_crypto_test
+
+      - name: Install example dependencies
+        working-directory: example
+        run: flutter pub get
+
+      - name: Analyze example
+        working-directory: example
+        run: flutter analyze
+
+      - name: Run example tests
+        working-directory: example
+        run: flutter test
+
+      - name: Verify package archive
+        run: flutter pub publish --dry-run
+
+  publish:
+    needs: verify
+    permissions:
+      id-token: write
+    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
+    with:
+      environment: pub.dev

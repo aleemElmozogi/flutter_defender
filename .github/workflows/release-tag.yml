@@ -1,4 +1,4 @@
-name: Release to pub.dev
+name: Release Tag
 
 on:
   push:
@@ -12,15 +12,11 @@ concurrency:
 
 permissions:
   contents: write
-  id-token: write
 
 jobs:
   verify-and-tag:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    environment:
-      name: pub.dev
-      url: https://pub.dev/packages/flutter_defender
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -110,6 +106,8 @@ jobs:
 
       - name: Verify or create release tag
         if: steps.release_status.outputs.required == 'true'
+        env:
+          RELEASE_TAG_TOKEN: ${{ secrets.RELEASE_TAG_TOKEN }}
         run: |
           tag="v${{ steps.current_version.outputs.value }}"
           if git rev-parse "$tag" >/dev/null 2>&1; then
@@ -117,25 +115,11 @@ jobs:
             echo "Tag $tag already points to release commit $tagged_sha."
             exit 0
           fi
+          if [ -z "$RELEASE_TAG_TOKEN" ]; then
+            echo "Missing RELEASE_TAG_TOKEN secret." >&2
+            exit 1
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag "$tag" "$GITHUB_SHA"
-          git push origin "$tag"
-
-      - name: Set up Dart publishing credentials
-        if: steps.release_status.outputs.required == 'true'
-        uses: dart-lang/setup-dart@v1
-
-      - name: Check out tagged release
-        if: steps.release_status.outputs.required == 'true'
-        run: |
-          git checkout "v${{ steps.current_version.outputs.value }}"
-          git checkout "$GITHUB_SHA" -- .pubignore
-
-      - name: Verify package is ready to publish
-        if: steps.release_status.outputs.required == 'true'
-        run: flutter pub publish --dry-run
-
-      - name: Publish package
-        if: steps.release_status.outputs.required == 'true'
-        run: flutter pub publish --force
+          git push "https://x-access-token:${RELEASE_TAG_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$tag"
