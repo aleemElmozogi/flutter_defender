@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../ui/flutter_defender_message_id.dart';
@@ -15,7 +16,7 @@ class FlutterDefenderConfig {
     this.enableSecureStorageHelper = false,
     this.clearSecureStorageOnLogout = false,
     this.failClosedOnPlatformError = false,
-    this.ignoreScreenBlocking = false,
+    this.ignoreScreenBlocking = !kReleaseMode,
     this.blockingScreenBuilder,
     this.onLogoutRequested,
     this.onRootDetected,
