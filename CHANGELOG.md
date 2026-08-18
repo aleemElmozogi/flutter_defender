@@ -10,9 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - New `ignoreScreenBlocking` init option. When enabled, guarded content is
-  never concealed and no blocking screen is drawn, even when a policy
-  violation is detected. Detection callbacks (`onRootDetected`,
-  `onProxyOrVpnDetected`, `onTamperingDetected`) still fire.
+  never concealed, no blocking screen is drawn, and native screenshot
+  hardening (`FLAG_SECURE` / iOS secure surface) is not enabled, so screenshots
+  are not blocked even when a policy violation is detected. Detection
+  callbacks (`onRootDetected`, `onProxyOrVpnDetected`, `onTamperingDetected`)
+  still fire. Defaults to `!kReleaseMode` (`true` in debug/profile, `false` in
+  release).
 
 ## [0.6.1] - 2026-07-17
 

@@ -150,9 +150,11 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
   /// names are supplied, [authenticatedBackgroundTimeoutSeconds] wins.
   /// Set [failClosedOnPlatformError] to keep guarded content blocked whenever
   /// required native protection or signal calls fail.
-  /// Set [ignoreScreenBlocking] to disable concealment and the blocking screen
-  /// entirely. Detection still runs and callbacks still fire, but guarded
-  /// content stays visible and interactive.
+  /// Set [ignoreScreenBlocking] to disable concealment, the blocking screen, and
+  /// native screenshot hardening (FLAG_SECURE / iOS secure surface). Detection
+  /// still runs and callbacks still fire, but guarded content stays visible and
+  /// interactive and screenshots are not blocked. It defaults to `true` in
+  /// debug/profile builds and `false` in release builds.
   Future<void> init({
     int otpBackgroundTimeoutSeconds = 60,
     int? authenticatedBackgroundTimeoutSeconds,
@@ -169,7 +171,7 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
     bool enableSecureStorageHelper = false,
     bool clearSecureStorageOnLogout = false,
     bool failClosedOnPlatformError = false,
-    bool ignoreScreenBlocking = false,
+    bool ignoreScreenBlocking = !kReleaseMode,
     Widget Function(String message)? blockingScreenBuilder,
     VoidCallback? onLogoutRequested,
     VoidCallback? onRootDetected,

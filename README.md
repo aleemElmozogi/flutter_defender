@@ -188,7 +188,7 @@ Options:
 - `enableSecureStorageHelper` (default `false`)
 - `clearSecureStorageOnLogout` (default `false`)
 - `failClosedOnPlatformError` (default `false`)
-- `ignoreScreenBlocking` (default `false`)
+- `ignoreScreenBlocking` (default `!kReleaseMode`: `true` in debug/profile, `false` in release)
 - `onLogoutRequested`
 - `onRootDetected`
 - `onProxyOrVpnDetected`
@@ -202,10 +202,13 @@ Options:
 `onLogoutRequested` may run while `init()` restores an expired cold-start
 snapshot, before `runApp`. Keep it safe when no navigator or widget tree exists.
 
-Set `ignoreScreenBlocking: true` to disable concealment and the blocking
-screen while keeping detection active. Guarded content stays visible and
-interactive, but detection callbacks such as `onRootDetected`,
-`onProxyOrVpnDetected`, and `onTamperingDetected` still fire. Useful for
+Set `ignoreScreenBlocking: true` to disable concealment, the blocking screen,
+and native screenshot hardening (`FLAG_SECURE` / iOS secure surface) while
+keeping detection active. Guarded content stays visible and interactive, and
+screenshots are not blocked, but detection callbacks such as `onRootDetected`,
+`onProxyOrVpnDetected`, and `onTamperingDetected` still fire. It defaults to
+`true` in debug/profile builds and `false` in release builds, so development
+builds are not blocked while release builds remain protected. Useful for
 development, debugging, or a grace period before enforcement is enabled.
 
 ### Native Failure Policy

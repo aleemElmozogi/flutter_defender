@@ -228,7 +228,7 @@ All are `part of flutter_defender.dart` and extend the `FlutterDefender` class:
 | Guard management | `controller/flutter_defender_guard_management.dart` | `registerGuard` / `unregisterGuard` registry (`_activeGuards`), computes active guard kind. | Called by guard widgets on mount/unmount; drives `_syncProtection`. |
 | Platform safety | `controller/flutter_defender_platform_safety.dart` | Wraps native calls in try/catch (fail-open/fail-closed), merges FFI emulator signal with Pigeon runtime state. | Calls `FlutterDefenderPlatform` + `FlutterDefenderNative`. |
 | Policy blocking | `controller/flutter_defender_policy_blocking.dart` | Priority-ordered blocking state (`_recomputeBlockingState`): platform unavailable → emulator → root → proxy/VPN → tampering → screen capture → … → shows blocking UI. | Reads `RuntimeState`, renders blocking via UI layer. |
-| Policy sync | `controller/flutter_defender_policy_sync.dart` | Foreground/background timeout enforcement, OTP pops, logout requests, cold-start lifecycle snapshot replay. | Uses lifecycle callbacks, secure-storage clear, `_requestLogout`. |
+| Policy sync | `controller/flutter_defender_policy_sync.dart` | Foreground/background timeout enforcement, OTP pops, logout requests, cold-start lifecycle snapshot replay. Gates native protection activation on `ignoreScreenBlocking`. | Uses lifecycle callbacks, secure-storage clear, `_requestLogout`; calls `_safeSetProtectionState` only when blocking is enforced. |
 
 ### 3.6 Guard Widgets & Blocking UI
 
@@ -242,9 +242,10 @@ All are `part of flutter_defender.dart` and extend the `FlutterDefender` class:
   - Guards subscribe to the runtime notifier; while a guard is active, protected content is
     **concealed** (`shouldConcealGuardedContent`) and replaced with the blocking UI.
   - When `ignoreScreenBlocking: true` (exposed as `FlutterDefender.screenBlockingIgnored`),
-    the guard skips concealment entirely and `hasBlockingOverlay` /
-    `shouldConcealGuardedContent` both return `false` — detection still runs and
-    callbacks (`onRootDetected`, `onProxyOrVpnDetected`, `onTamperingDetected`) still fire.
+    the guard skips concealment entirely, `hasBlockingOverlay` /
+    `shouldConcealGuardedContent` both return `false`, and native hardening is not
+    enabled — detection still runs and callbacks (`onRootDetected`,
+    `onProxyOrVpnDetected`, `onTamperingDetected`) still fire.
   - The OTP guard additionally exposes a `popRoute` used by timeout policy.
   - Styling comes from `FlutterDefenderUiTheme`; copy comes from
     `FlutterDefenderMessages` + generated localizations via `FlutterDefenderMessageId`.
@@ -401,8 +402,10 @@ sequenceDiagram
   failure can either conceal (fail-closed) or degrade gracefully (fail-open) depending on
   `failClosedOnPlatformError`.
 - **Opt-out for development:** `ignoreScreenBlocking` (set in `init`) suppresses
-  concealment and the blocking screen while keeping detection and callbacks active,
-  giving a grace/debug mode without touching the policy engine (`_recomputeBlockingState`
-  still runs and records blocking state; only the UI layer honors the bypass).
+  concealment, the blocking screen, and native hardening (`FLAG_SECURE` / iOS secure
+  surface) while keeping detection and callbacks active, giving a grace/debug mode
+  without touching the policy engine (`_recomputeBlockingState` still runs and records
+  blocking state; both the UI layer and `_syncProtection` honor the bypass). Defaults
+  to `true` in debug/profile builds and `false` in release builds.
 - **Cold-start resilience:** `LifecycleSnapshot` (written on background) is replayed on
   launch so an OTP/session timeout can be enforced even after the process was killed.

@@ -180,7 +180,9 @@ void main() {
     FlutterDefenderPlatform.instance = fakePlatform;
     defender = FlutterDefender.instance;
     defender.debugSetNowProvider(() => now);
-    await defender.init();
+    // Blocking tests opt in explicitly: `init` ignores screen blocking by
+    // default outside release builds.
+    await defender.init(ignoreScreenBlocking: false);
   });
 
   tearDown(() {
@@ -248,6 +250,9 @@ void main() {
     expect(defender.shouldConcealGuardedContent, isFalse);
     expect(find.byType(BlockingScreen), findsNothing);
     expect(find.text('secure'), findsOneWidget);
+    // Native hardening (FLAG_SECURE / secure surface) is never enabled either,
+    // so screenshots are not blocked.
+    expect(fakePlatform.protectionCalls, isNot(contains((true, true))));
   });
 
   testWidgets('strict platform failure policy blocks guarded content', (
@@ -255,7 +260,10 @@ void main() {
   ) async {
     defender.dispose();
     defender = FlutterDefender.instance;
-    await defender.init(failClosedOnPlatformError: true);
+    await defender.init(
+      failClosedOnPlatformError: true,
+      ignoreScreenBlocking: false,
+    );
     fakePlatform.throwOnSetProtectionState = true;
 
     await tester.pumpWidget(
@@ -291,6 +299,7 @@ void main() {
       var logoutCalls = 0;
       await defender.init(
         authenticatedBackgroundTimeoutSeconds: 1,
+        ignoreScreenBlocking: false,
         onLogoutRequested: () {
           logoutCalls += 1;
         },
@@ -343,6 +352,7 @@ void main() {
       var logoutCalls = 0;
       await defender.init(
         authenticatedBackgroundTimeoutSeconds: 1,
+        ignoreScreenBlocking: false,
         onLogoutRequested: () {
           logoutCalls += 1;
         },
@@ -380,6 +390,7 @@ void main() {
     defender = FlutterDefender.instance;
     await defender.init(
       blockingScreenBuilder: (String message) => Center(child: Text(message)),
+      ignoreScreenBlocking: false,
     );
 
     await tester.pumpWidget(
@@ -424,6 +435,7 @@ void main() {
     defender = FlutterDefender.instance;
     await defender.init(
       blockingScreenBuilder: (String message) => Center(child: Text(message)),
+      ignoreScreenBlocking: false,
     );
 
     await tester.pumpWidget(
@@ -473,7 +485,7 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     defender.dispose();
     defender = FlutterDefender.instance;
-    await defender.init();
+    await defender.init(ignoreScreenBlocking: false);
 
     await tester.pumpWidget(
       const MaterialApp(
@@ -518,6 +530,7 @@ void main() {
     defender = FlutterDefender.instance;
     await defender.init(
       blockingScreenBuilder: (String message) => Center(child: Text(message)),
+      ignoreScreenBlocking: false,
     );
 
     await tester.pumpWidget(
@@ -563,6 +576,7 @@ void main() {
     defender = FlutterDefender.instance;
     await defender.init(
       blockingScreenBuilder: (String message) => Center(child: Text(message)),
+      ignoreScreenBlocking: false,
     );
 
     await tester.pumpWidget(
@@ -768,7 +782,10 @@ void main() {
   ) async {
     defender.dispose();
     defender = FlutterDefender.instance;
-    await defender.init(enableProxyVpnDetection: true);
+    await defender.init(
+      enableProxyVpnDetection: true,
+      ignoreScreenBlocking: false,
+    );
     fakePlatform.advancedSecuritySignals = pigeon.AdvancedSecuritySignals(
       rootedOrJailbroken: false,
       proxyEnabled: false,
@@ -807,7 +824,10 @@ void main() {
   ) async {
     defender.dispose();
     defender = FlutterDefender.instance;
-    await defender.init(enableRaspDetection: true);
+    await defender.init(
+      enableRaspDetection: true,
+      ignoreScreenBlocking: false,
+    );
     fakePlatform.advancedSecuritySignals = pigeon.AdvancedSecuritySignals(
       rootedOrJailbroken: false,
       proxyEnabled: false,
@@ -1059,8 +1079,14 @@ void main() {
     defender.dispose();
     defender = FlutterDefender.instance;
 
-    final Future<void> initA = defender.init(enableForegroundCheck: true);
-    final Future<void> initB = defender.init(enableForegroundCheck: false);
+    final Future<void> initA = defender.init(
+      enableForegroundCheck: true,
+      ignoreScreenBlocking: false,
+    );
+    final Future<void> initB = defender.init(
+      enableForegroundCheck: false,
+      ignoreScreenBlocking: false,
+    );
     await Future.wait(<Future<void>>[initA, initB]);
 
     await tester.pumpWidget(
