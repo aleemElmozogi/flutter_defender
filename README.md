@@ -188,6 +188,7 @@ Options:
 - `enableSecureStorageHelper` (default `false`)
 - `clearSecureStorageOnLogout` (default `false`)
 - `failClosedOnPlatformError` (default `false`)
+- `ignoreScreenBlocking` (default `false`)
 - `onLogoutRequested`
 - `onRootDetected`
 - `onProxyOrVpnDetected`
@@ -200,6 +201,12 @@ Options:
 
 `onLogoutRequested` may run while `init()` restores an expired cold-start
 snapshot, before `runApp`. Keep it safe when no navigator or widget tree exists.
+
+Set `ignoreScreenBlocking: true` to disable concealment and the blocking
+screen while keeping detection active. Guarded content stays visible and
+interactive, but detection callbacks such as `onRootDetected`,
+`onProxyOrVpnDetected`, and `onTamperingDetected` still fire. Useful for
+development, debugging, or a grace period before enforcement is enabled.
 
 ### Native Failure Policy
 

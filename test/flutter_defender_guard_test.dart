@@ -220,6 +220,36 @@ void main() {
     expect(find.text('secure'), findsOneWidget);
   });
 
+  testWidgets('ignoreScreenBlocking keeps guarded content visible', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init(ignoreScreenBlocking: true);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secure')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Policy violations are detected but never block the guarded screen.
+    fakePlatform.emitScreenCaptureChanged(true);
+    fakePlatform.emitOverlayViolation();
+    fakePlatform.emitForegroundStateChanged(false);
+    fakePlatform.emitScreenshot();
+    await tester.pumpAndSettle();
+
+    expect(defender.screenBlockingIgnored, isTrue);
+    expect(defender.hasBlockingOverlay, isFalse);
+    expect(defender.shouldConcealGuardedContent, isFalse);
+    expect(find.byType(BlockingScreen), findsNothing);
+    expect(find.text('secure'), findsOneWidget);
+  });
+
   testWidgets('strict platform failure policy blocks guarded content', (
     WidgetTester tester,
   ) async {
