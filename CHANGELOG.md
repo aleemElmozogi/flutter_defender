@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Reorganized the package documentation around a concise quick start with focused guides for Android launch protection, attestation, security boundaries, and release maintenance.
+- Split the iOS plugin implementation into focused detector, secure-storage, secure-surface, attestation, and plugin-wiring files.
+- Kept Pigeon outputs committed for package consumers, marked them as generated for code review, and added a reproducible generation command plus CI drift checks.
 
 ### Security
 

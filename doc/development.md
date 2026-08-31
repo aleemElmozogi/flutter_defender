@@ -6,6 +6,7 @@
 flutter analyze
 flutter test
 c++ -std=c++17 -Wall -Wextra -Werror -I src/native/include src/native/src/crypto/defender_crypto.cpp test/native/defender_crypto_test.cpp -o /tmp/flutter_defender_crypto_test && /tmp/flutter_defender_crypto_test
+./tool/generate_pigeon.sh --check
 flutter pub publish --dry-run
 
 cd example
@@ -13,6 +14,23 @@ flutter build apk --release
 flutter build ios --simulator --debug --no-pub
 flutter test
 ```
+
+## Generated platform channels
+
+`pigeons/defender_messages.dart` is the readable source of truth for the typed
+Flutter/native channel. Its Dart, Kotlin, and Swift outputs are intentionally
+committed because package consumers compile them directly and do not run Pigeon
+during their app build.
+
+After changing the Pigeon schema, regenerate all outputs with:
+
+```bash
+./tool/generate_pigeon.sh
+```
+
+Do not edit `DefenderMessages.g.*` by hand. CI runs the same command with
+`--check` and rejects generated files that do not match the schema and pinned
+Pigeon version.
 
 ## Release automation
 

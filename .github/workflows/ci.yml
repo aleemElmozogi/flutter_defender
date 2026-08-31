@@ -28,6 +28,9 @@ jobs:
       - name: Install dependencies (package)
         run: flutter pub get
 
+      - name: Verify generated platform channels
+        run: ./tool/generate_pigeon.sh --check
+
       - name: Verify release metadata
         run: python3 tool/check_version_bump.py --check-current pubspec.yaml
 
