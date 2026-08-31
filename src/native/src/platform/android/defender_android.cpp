@@ -108,7 +108,7 @@ bool IsDebuggerAttachedImpl() {
 }
 
 bool IsRootedOrJailbrokenImpl() {
-  static constexpr std::array<const char*, 16> kRootPaths = {
+  static constexpr std::array<const char*, 21> kRootPaths = {
       "/system/app/Superuser.apk",
       "/sbin/su",
       "/system/bin/su",
@@ -119,6 +119,11 @@ bool IsRootedOrJailbrokenImpl() {
       "/system/bin/failsafe/su",
       "/data/local/su",
       "/system/bin/.ext/.su",
+      "/system/usr/we-need-root/su",
+      "/cache/su",
+      "/data/su",
+      "/dev/com.koushikdutta.superuser.daemon/",
+      "/system/xbin/daemonsu",
       "/data/adb/magisk",
       "/sbin/.magisk",
       "/debug_ramdisk/su",

@@ -6,6 +6,13 @@ extension _FlutterDefenderPolicyBlocking on FlutterDefender {
       _clearBlockingState();
       return;
     }
+    if (_runtime.platformUnavailableBlocked) {
+      _showBlocking(
+        FlutterDefenderMessageId.protectionUnavailable,
+        DefenderBlockingSource.platformUnavailable,
+      );
+      return;
+    }
     if (_runtime.emulatorBlocked) {
       _showBlocking(
         FlutterDefenderMessageId.emulatorReleaseBlocked,
@@ -41,17 +48,17 @@ extension _FlutterDefenderPolicyBlocking on FlutterDefender {
       );
       return;
     }
-    if (_config.enableForegroundCheck && !_runtime.isForeground) {
-      _showBlocking(
-        FlutterDefenderMessageId.foregroundRequired,
-        DefenderBlockingSource.foreground,
-      );
-      return;
-    }
     if (_runtime.overlayViolationActive) {
       _showBlocking(
         FlutterDefenderMessageId.overlaysBlocked,
         DefenderBlockingSource.overlay,
+      );
+      return;
+    }
+    if (_config.enableForegroundCheck && !_runtime.isForeground) {
+      _showBlocking(
+        FlutterDefenderMessageId.foregroundRequired,
+        DefenderBlockingSource.foreground,
       );
       return;
     }

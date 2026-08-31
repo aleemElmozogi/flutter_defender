@@ -10,6 +10,8 @@ final class FlutterDefenderMessages {
 
   static const String blockingScreenTitle = 'Security Policy';
 
+  static const String protectionUnavailable =
+      'Security Policy: Native protection is temporarily unavailable.';
   static const String emulatorReleaseBlocked =
       'Security Policy: This app cannot run on emulators in release mode.';
   static const String screenshotsBlocked =
@@ -31,6 +33,7 @@ final class FlutterDefenderMessages {
 
   static String stringFor(FlutterDefenderMessageId id) {
     return switch (id) {
+      FlutterDefenderMessageId.protectionUnavailable => protectionUnavailable,
       FlutterDefenderMessageId.emulatorReleaseBlocked => emulatorReleaseBlocked,
       FlutterDefenderMessageId.screenshotsBlocked => screenshotsBlocked,
       FlutterDefenderMessageId.overlaysBlocked => overlaysBlocked,
@@ -54,6 +57,8 @@ final class FlutterDefenderMessages {
     );
     if (loc != null) {
       return switch (id) {
+        FlutterDefenderMessageId.protectionUnavailable =>
+          loc.protectionUnavailable,
         FlutterDefenderMessageId.emulatorReleaseBlocked =>
           loc.emulatorReleaseBlocked,
         FlutterDefenderMessageId.screenshotsBlocked => loc.screenshotsBlocked,

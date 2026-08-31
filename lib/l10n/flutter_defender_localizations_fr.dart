@@ -12,6 +12,10 @@ class FlutterDefenderLocalizationsFr extends FlutterDefenderLocalizations {
   String get blockingScreenTitle => 'Politique de sécurité';
 
   @override
+  String get protectionUnavailable =>
+      'Politique de sécurité : la protection native est temporairement indisponible.';
+
+  @override
   String get emulatorReleaseBlocked =>
       'Politique de sécurité : cette application ne peut pas s\'exécuter sur un émulateur en mode production.';
 

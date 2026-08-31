@@ -1,4 +1,5 @@
 enum FlutterDefenderMessageId {
+  protectionUnavailable,
   emulatorReleaseBlocked,
   screenshotsBlocked,
   overlaysBlocked,

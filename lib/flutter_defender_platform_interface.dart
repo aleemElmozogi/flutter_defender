@@ -11,13 +11,20 @@ class FlutterDefenderPlatformCallbacks {
     this.onScreenshotDetected,
     this.onScreenCaptureChanged,
     this.onOverlayViolation,
+    this.onOverlayCleared,
     this.onForegroundStateChanged,
+    this.onWindowFocusChanged,
   });
 
   final VoidCallback? onScreenshotDetected;
   final FlutterDefenderBoolCallback? onScreenCaptureChanged;
   final VoidCallback? onOverlayViolation;
+  final VoidCallback? onOverlayCleared;
   final FlutterDefenderBoolCallback? onForegroundStateChanged;
+
+  /// Focus-only interruptions reported while a guard is active, such as a
+  /// biometric prompt window taking focus without pausing the activity.
+  final FlutterDefenderBoolCallback? onWindowFocusChanged;
 }
 
 abstract class FlutterDefenderPlatform extends PlatformInterface {

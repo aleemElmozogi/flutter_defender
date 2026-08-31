@@ -111,6 +111,12 @@ abstract class FlutterDefenderLocalizations {
   /// **'Security Policy'**
   String get blockingScreenTitle;
 
+  /// No description provided for @protectionUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Security Policy: Native protection is temporarily unavailable.'**
+  String get protectionUnavailable;
+
   /// No description provided for @emulatorReleaseBlocked.
   ///
   /// In en, this message translates to:

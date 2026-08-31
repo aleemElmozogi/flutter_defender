@@ -1,6 +1,7 @@
 {
   "@@locale": "fr",
   "blockingScreenTitle": "Politique de sécurité",
+  "protectionUnavailable": "Politique de sécurité : la protection native est temporairement indisponible.",
   "emulatorReleaseBlocked": "Politique de sécurité : cette application ne peut pas s'exécuter sur un émulateur en mode production.",
   "screenshotsBlocked": "Politique de sécurité : les captures d'écran ne sont pas autorisées sur les écrans sensibles.",
   "overlaysBlocked": "Politique de sécurité : les superpositions d'écran ne sont pas autorisées lorsque du contenu sensible est affiché.",

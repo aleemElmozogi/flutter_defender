@@ -32,6 +32,9 @@ jobs:
       - name: Install dependencies (package)
         run: flutter pub get
 
+      - name: Verify Android root-indicator parity
+        run: python3 tool/check_android_root_path_parity.py
+
       - name: Analyze package
         run: flutter analyze
 
@@ -46,6 +49,15 @@ jobs:
             test/native/android_emulator_classifier_test.cpp \
             -o /tmp/flutter_defender_emulator_test
           /tmp/flutter_defender_emulator_test
+
+      - name: Run native HMAC-SHA256 known-answer tests
+        run: |
+          c++ -std=c++17 -Wall -Wextra -Werror \
+            -I src/native/include \
+            src/native/src/crypto/defender_crypto.cpp \
+            test/native/defender_crypto_test.cpp \
+            -o /tmp/flutter_defender_crypto_test
+          /tmp/flutter_defender_crypto_test
 
       - name: Install dependencies (example)
         working-directory: example
@@ -77,8 +89,29 @@ jobs:
           fi
           echo "value=$version" >> "$GITHUB_OUTPUT"
 
-      - name: Verify version bump
+      - name: Check whether version is already published
+        id: release_status
+        env:
+          PACKAGE_VERSION: ${{ steps.current_version.outputs.value }}
         run: |
+          if curl --fail --silent --show-error \
+            "https://pub.dev/api/packages/flutter_defender/versions/${PACKAGE_VERSION}" \
+            >/dev/null 2>&1; then
+            echo "Version ${PACKAGE_VERSION} is already published; no release is needed."
+            echo "required=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Version ${PACKAGE_VERSION} is not published yet."
+            echo "required=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify version bump
+        if: steps.release_status.outputs.required == 'true'
+        run: |
+          tag="v${{ steps.current_version.outputs.value }}"
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "Existing release tag $tag found; skipping previous-version comparison."
+            exit 0
+          fi
           before_sha="${{ github.event.before }}"
           if [ "$before_sha" = "0000000000000000000000000000000000000000" ]; then
             echo "Initial branch push detected; skipping previous-version comparison."
@@ -88,24 +121,21 @@ jobs:
           git show "${before_sha}:pubspec.yaml" > /tmp/previous-pubspec.yaml
           python3 tool/check_version_bump.py /tmp/previous-pubspec.yaml pubspec.yaml
 
-      - name: Ensure release tag does not already exist
-        run: |
-          tag="v${{ steps.current_version.outputs.value }}"
-          if git rev-parse "$tag" >/dev/null 2>&1; then
-            echo "Tag $tag already exists." >&2
-            exit 1
-          fi
-
-      - name: Create and push release tag
+      - name: Verify or create release tag
+        if: steps.release_status.outputs.required == 'true'
         env:
           RELEASE_TAG_TOKEN: ${{ secrets.RELEASE_TAG_TOKEN }}
         run: |
+          tag="v${{ steps.current_version.outputs.value }}"
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            tagged_sha=$(git rev-list -n 1 "$tag")
+            echo "Tag $tag already points to release commit $tagged_sha."
+            exit 0
+          fi
           if [ -z "$RELEASE_TAG_TOKEN" ]; then
-            echo "Missing RELEASE_TAG_TOKEN secret. Create a fine-grained PAT with Contents: Read and write so tag pushes can trigger the publish workflow." >&2
+            echo "Missing RELEASE_TAG_TOKEN secret." >&2
             exit 1
           fi
-
-          tag="v${{ steps.current_version.outputs.value }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag "$tag" "$GITHUB_SHA"

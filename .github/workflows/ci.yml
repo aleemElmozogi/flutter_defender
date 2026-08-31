@@ -28,6 +28,12 @@ jobs:
       - name: Install dependencies (package)
         run: flutter pub get
 
+      - name: Verify release metadata
+        run: python3 tool/check_version_bump.py --check-current pubspec.yaml
+
+      - name: Verify Android root-indicator parity
+        run: python3 tool/check_android_root_path_parity.py
+
       - name: Analyze package
         run: flutter analyze
 
@@ -42,6 +48,15 @@ jobs:
             test/native/android_emulator_classifier_test.cpp \
             -o /tmp/flutter_defender_emulator_test
           /tmp/flutter_defender_emulator_test
+
+      - name: Run native HMAC-SHA256 known-answer tests
+        run: |
+          c++ -std=c++17 -Wall -Wextra -Werror \
+            -I src/native/include \
+            src/native/src/crypto/defender_crypto.cpp \
+            test/native/defender_crypto_test.cpp \
+            -o /tmp/flutter_defender_crypto_test
+          /tmp/flutter_defender_crypto_test
 
       - name: Install dependencies (example)
         working-directory: example

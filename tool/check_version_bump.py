@@ -9,6 +9,10 @@ from pathlib import Path
 
 
 VERSION_RE = re.compile(r"^version:[ \t]*['\"]?([^'\"\r\n]+)['\"]?[ \t]*$", re.MULTILINE)
+PODSPEC_VERSION_RE = re.compile(
+    r"^\s*s\.version\s*=\s*['\"]([^'\"]+)['\"]", re.MULTILINE
+)
+CHANGELOG_RELEASE_RE = re.compile(r"^## \[(?!Unreleased\])([^\]]+)\]", re.MULTILINE)
 SEMVER_RE = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
     r"(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?"
@@ -30,6 +34,38 @@ def read_version(path: str) -> str:
     if not match:
         raise ValueError(f"Could not find a version field in {path}.")
     return match.group(1).strip()
+
+
+def read_matching_version(path: Path, pattern: re.Pattern[str], label: str) -> str:
+    match = pattern.search(path.read_text(encoding="utf-8"))
+    if not match:
+        raise ValueError(f"Could not find {label} version in {path}.")
+    return match.group(1).strip()
+
+
+def check_current_metadata(pubspec_path: str) -> str:
+    pubspec = Path(pubspec_path)
+    root = pubspec.parent
+    pubspec_version = read_version(str(pubspec))
+    podspec_version = read_matching_version(
+        root / "ios" / "flutter_defender.podspec",
+        PODSPEC_VERSION_RE,
+        "podspec",
+    )
+    changelog_version = read_matching_version(
+        root / "CHANGELOG.md",
+        CHANGELOG_RELEASE_RE,
+        "latest released changelog",
+    )
+    versions = {
+        "pubspec.yaml": pubspec_version,
+        "ios/flutter_defender.podspec": podspec_version,
+        "CHANGELOG.md": changelog_version,
+    }
+    if len(set(versions.values())) != 1:
+        details = ", ".join(f"{name}={version}" for name, version in versions.items())
+        raise ValueError(f"Release metadata versions do not match: {details}.")
+    return pubspec_version
 
 
 def parse(version: str) -> Version:
@@ -80,14 +116,30 @@ def compare(left: Version, right: Version) -> int:
 
 
 def main() -> int:
+    if len(sys.argv) == 3 and sys.argv[1] == "--check-current":
+        try:
+            version = check_current_metadata(sys.argv[2])
+        except (OSError, ValueError) as error:
+            print(f"Release metadata check failed: {error}", file=sys.stderr)
+            return 1
+        print(f"Release metadata verified at {version}")
+        return 0
+
     if len(sys.argv) != 3:
-        print("Usage: check_version_bump.py <previous-pubspec> <current-pubspec>")
+        print(
+            "Usage: check_version_bump.py <previous-pubspec> <current-pubspec>\n"
+            "   or: check_version_bump.py --check-current <pubspec>"
+        )
         return 2
 
-    previous_raw = read_version(sys.argv[1])
-    current_raw = read_version(sys.argv[2])
-    previous = parse(previous_raw)
-    current = parse(current_raw)
+    try:
+        previous_raw = read_version(sys.argv[1])
+        current_raw = check_current_metadata(sys.argv[2])
+        previous = parse(previous_raw)
+        current = parse(current_raw)
+    except (OSError, ValueError) as error:
+        print(f"Version check failed: {error}", file=sys.stderr)
+        return 1
 
     if compare(current, previous) <= 0:
         print(

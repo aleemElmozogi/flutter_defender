@@ -41,6 +41,7 @@ class FakeFlutterDefenderPlatform
       );
   final Map<String, String> secureStorage = <String, String>{};
   bool throwOnGetRuntimeState = false;
+  bool throwOnSetProtectionState = false;
   bool throwOnSecureWrite = false;
   bool throwOnSecureRead = false;
   bool throwOnSecureDelete = false;
@@ -102,6 +103,9 @@ class FakeFlutterDefenderPlatform
     required bool secureActive,
     required bool overlayHardeningActive,
   }) async {
+    if (throwOnSetProtectionState) {
+      throw PlatformException(code: 'protection_state_failure');
+    }
     protectionCalls.add((secureActive, overlayHardeningActive));
   }
 
@@ -146,8 +150,20 @@ class FakeFlutterDefenderPlatform
     callbacks?.onScreenCaptureChanged?.call(active);
   }
 
+  void emitOverlayViolation() {
+    callbacks?.onOverlayViolation?.call();
+  }
+
+  void emitOverlayCleared() {
+    callbacks?.onOverlayCleared?.call();
+  }
+
   void emitForegroundStateChanged(bool active) {
     callbacks?.onForegroundStateChanged?.call(active);
+  }
+
+  void emitWindowFocusChanged(bool hasFocus) {
+    callbacks?.onWindowFocusChanged?.call(hasFocus);
   }
 }
 
@@ -185,6 +201,328 @@ void main() {
       expect(fakePlatform.savedSnapshots.last.wasAuthenticated, isTrue);
     },
   );
+
+  testWidgets('platform failures remain fail-open by default', (
+    WidgetTester tester,
+  ) async {
+    fakePlatform.throwOnSetProtectionState = true;
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secure')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(defender.hasBlockingOverlay, isFalse);
+    expect(find.text('secure'), findsOneWidget);
+  });
+
+  testWidgets('strict platform failure policy blocks guarded content', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init(failClosedOnPlatformError: true);
+    fakePlatform.throwOnSetProtectionState = true;
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secure')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(defender.hasBlockingOverlay, isTrue);
+    expect(
+      find.text(FlutterDefenderMessages.protectionUnavailable),
+      findsOneWidget,
+    );
+
+    fakePlatform.throwOnSetProtectionState = false;
+    fakePlatform.emitForegroundStateChanged(true);
+    await tester.pumpAndSettle();
+
+    expect(defender.hasBlockingOverlay, isFalse);
+    expect(find.text('secure'), findsOneWidget);
+  });
+
+  testWidgets(
+    'window focus loss conceals guarded content without blocking or timeout',
+    (WidgetTester tester) async {
+      defender.dispose();
+      defender = FlutterDefender.instance;
+      final DateTime base = DateTime(2026, 4, 12, 12);
+      defender.debugSetNowProvider(() => base);
+      var logoutCalls = 0;
+      await defender.init(
+        authenticatedBackgroundTimeoutSeconds: 1,
+        onLogoutRequested: () {
+          logoutCalls += 1;
+        },
+      );
+      defender.setAuthenticated(true);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: FlutterDefenderSensitiveGuard(
+            child: Scaffold(body: Text('secure')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      fakePlatform.emitWindowFocusChanged(false);
+      await tester.pump();
+
+      expect(defender.shouldConcealGuardedContent, isTrue);
+      expect(defender.hasBlockingOverlay, isFalse);
+      expect(
+        find.text(FlutterDefenderMessages.protectedContentHidden),
+        findsOneWidget,
+      );
+      expect(
+        find.text(FlutterDefenderMessages.foregroundRequired),
+        findsNothing,
+      );
+
+      defender.debugSetNowProvider(() => base.add(const Duration(seconds: 30)));
+      fakePlatform.emitWindowFocusChanged(true);
+      await tester.pumpAndSettle();
+
+      expect(logoutCalls, 0);
+      expect(defender.shouldConcealGuardedContent, isFalse);
+      expect(
+        find.text(FlutterDefenderMessages.protectedContentHidden),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    'android inactive system prompt does not trigger blocking or timeout',
+    (WidgetTester tester) async {
+      defender.dispose();
+      defender = FlutterDefender.instance;
+      final DateTime base = DateTime(2026, 4, 12, 12);
+      defender.debugSetNowProvider(() => base);
+      var logoutCalls = 0;
+      await defender.init(
+        authenticatedBackgroundTimeoutSeconds: 1,
+        onLogoutRequested: () {
+          logoutCalls += 1;
+        },
+      );
+      defender.setAuthenticated(true);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: FlutterDefenderSensitiveGuard(
+            child: Scaffold(body: Text('secure')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      defender.didChangeAppLifecycleState(AppLifecycleState.inactive);
+      defender.debugSetNowProvider(() => base.add(const Duration(seconds: 30)));
+      await tester.pump();
+
+      expect(find.text('secure'), findsOneWidget);
+      expect(defender.hasBlockingOverlay, isFalse);
+
+      defender.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      expect(logoutCalls, 0);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
+
+  testWidgets('overlay violation keeps the overlay-specific message', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init(
+      blockingScreenBuilder: (String message) => Center(child: Text(message)),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates:
+            FlutterDefenderLocalizations.localizationsDelegates,
+        supportedLocales: FlutterDefenderLocalizations.supportedLocales,
+        home: const FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secure')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    fakePlatform.emitOverlayViolation();
+    fakePlatform.emitForegroundStateChanged(false);
+    await tester.pumpAndSettle();
+
+    expect(defender.hasBlockingOverlay, isTrue);
+    expect(
+      find.text(
+        FlutterDefenderMessages.stringFor(
+          FlutterDefenderMessageId.overlaysBlocked,
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        FlutterDefenderMessages.stringFor(
+          FlutterDefenderMessageId.foregroundRequired,
+        ),
+      ),
+      findsNothing,
+    );
+  });
+
+  testWidgets('overlay violation recovers without unregistering the guard', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init(
+      blockingScreenBuilder: (String message) => Center(child: Text(message)),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates:
+            FlutterDefenderLocalizations.localizationsDelegates,
+        supportedLocales: FlutterDefenderLocalizations.supportedLocales,
+        home: const FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secure')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    fakePlatform.emitOverlayViolation();
+    await tester.pump();
+
+    expect(defender.hasBlockingOverlay, isTrue);
+    expect(
+      find.text(
+        FlutterDefenderMessages.stringFor(
+          FlutterDefenderMessageId.overlaysBlocked,
+        ),
+      ),
+      findsOneWidget,
+    );
+
+    fakePlatform.emitOverlayCleared();
+    await tester.pump();
+
+    expect(defender.hasBlockingOverlay, isFalse);
+    expect(
+      find.text(
+        FlutterDefenderMessages.stringFor(
+          FlutterDefenderMessageId.overlaysBlocked,
+        ),
+      ),
+      findsNothing,
+    );
+    expect(find.text('secure'), findsOneWidget);
+  });
+
+  testWidgets('default blocking overlay scrolls in constrained guards', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init();
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: FlutterDefenderSensitiveGuard(
+          child: Scaffold(
+            body: ColoredBox(
+              color: Colors.white,
+              child: Center(child: Text('secure')),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    fakePlatform.emitOverlayViolation();
+    await tester.pumpAndSettle();
+
+    expect(defender.hasBlockingOverlay, isTrue);
+    expect(tester.takeException(), isNull);
+    final Finder scrollableFinder = find.descendant(
+      of: find.byType(BlockingScreen),
+      matching: find.byType(Scrollable),
+    );
+    final ScrollPosition position = tester
+        .state<ScrollableState>(scrollableFinder)
+        .position;
+    expect(position.maxScrollExtent, greaterThan(0));
+    final Finder hitTestableScrollable = scrollableFinder.hitTestable();
+    expect(hitTestableScrollable, findsOneWidget);
+
+    await tester.drag(hitTestableScrollable, const Offset(0, -80));
+    await tester.pumpAndSettle();
+
+    expect(position.pixels, greaterThan(0));
+  });
+
+  testWidgets('foreground message appears for an actual background signal', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init(
+      blockingScreenBuilder: (String message) => Center(child: Text(message)),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates:
+            FlutterDefenderLocalizations.localizationsDelegates,
+        supportedLocales: FlutterDefenderLocalizations.supportedLocales,
+        home: const FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secure')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    fakePlatform.emitForegroundStateChanged(false);
+    await tester.pumpAndSettle();
+
+    expect(defender.hasBlockingOverlay, isTrue);
+    expect(
+      find.text(
+        FlutterDefenderMessages.stringFor(
+          FlutterDefenderMessageId.foregroundRequired,
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        FlutterDefenderMessages.stringFor(
+          FlutterDefenderMessageId.overlaysBlocked,
+        ),
+      ),
+      findsNothing,
+    );
+  });
 
   testWidgets('blocking overlay prevents interaction for custom builders', (
     WidgetTester tester,
@@ -230,6 +568,10 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('tap me'), findsOneWidget);
+
+    await tester.tap(find.text('tap me'), warnIfMissed: false);
+    await tester.pump();
+
     expect(tapped, 0);
   });
 
@@ -414,6 +756,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 100)),
+    );
+    await tester.pumpAndSettle();
 
     expect(defender.shouldConcealGuardedContent, isTrue);
     expect(
@@ -447,6 +793,10 @@ void main() {
           child: Scaffold(body: Text('secure')),
         ),
       ),
+    );
+    await tester.pumpAndSettle();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 100)),
     );
     await tester.pumpAndSettle();
 
@@ -596,6 +946,37 @@ void main() {
     fakePlatform.emitForegroundStateChanged(true);
     await tester.pump();
 
+    expect(logoutCalls, 1);
+  });
+
+  testWidgets('current authenticated timeout overrides deprecated alias', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    final DateTime base = DateTime(2026, 4, 12, 12);
+    defender.debugSetNowProvider(() => base);
+    var logoutCalls = 0;
+    await defender.init(
+      authenticatedBackgroundTimeoutSeconds: 20,
+      // ignore: deprecated_member_use_from_same_package
+      pinBackgroundTimeoutSeconds: 10,
+      onLogoutRequested: () {
+        logoutCalls += 1;
+      },
+    );
+
+    defender.setAuthenticated(true);
+    defender.didChangeAppLifecycleState(AppLifecycleState.paused);
+    defender.debugSetNowProvider(() => base.add(const Duration(seconds: 10)));
+    defender.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await tester.pump();
+    expect(logoutCalls, 0);
+
+    defender.didChangeAppLifecycleState(AppLifecycleState.paused);
+    defender.debugSetNowProvider(() => base.add(const Duration(seconds: 30)));
+    defender.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await tester.pump();
     expect(logoutCalls, 1);
   });
 

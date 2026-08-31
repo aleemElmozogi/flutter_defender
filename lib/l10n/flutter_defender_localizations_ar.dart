@@ -12,6 +12,10 @@ class FlutterDefenderLocalizationsAr extends FlutterDefenderLocalizations {
   String get blockingScreenTitle => 'حماية البيانات';
 
   @override
+  String get protectionUnavailable =>
+      'الحماية الأمنية غير متاحة مؤقتًا. يرجى المحاولة مرة أخرى.';
+
+  @override
   String get emulatorReleaseBlocked => 'يجب استخدام جهاز حقيقي لتشغيل التطبيق.';
 
   @override

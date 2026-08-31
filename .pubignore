@@ -1,0 +1,11 @@
+.dart_tool/
+.github/
+.idea/
+.pub/
+.swiftpm/
+build/
+coverage/
+pubspec.lock
+*.iml
+*.log
+.DS_Store
