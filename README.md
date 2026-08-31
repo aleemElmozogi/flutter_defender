@@ -24,7 +24,7 @@ There is no route-observer setup. A guarded screen protects itself before the se
 
 ```yaml
 dependencies:
-  flutter_defender: ^0.6.2
+  flutter_defender: ^0.7.0
 ```
 
 ### Android release emulator launch block
@@ -232,6 +232,113 @@ Secure-storage errors are separate and always remain fail-fast.
 ## Advanced Security Layers
 
 All advanced layers are optional and configured at `init`.
+
+### Server-Verified Device and App Attestation
+
+Local root, jailbreak, emulator, and hooking checks are best-effort risk
+signals. An attacker controlling the client process can patch their results.
+Use `FlutterDefenderAttestation` when a backend must authorize a sensitive
+operation:
+
+- Android uses Play Integrity standard requests.
+- iOS uses App Attest hardware-backed keys and assertions.
+- The package returns encrypted tokens or binary attestation artifacts only.
+- A trusted backend must verify every artifact and make the authorization
+  decision. Client-side success is never proof of trust.
+
+Android setup:
+
+1. Enable Play Integrity for the host app's Google Cloud project and link it in
+   Play Console as described in the
+   [official setup guide](https://developer.android.com/google/play/integrity/setup).
+2. Warm the token provider before the first sensitive operation.
+3. Hash a canonical request containing the relevant action fields and a fresh,
+   server-issued challenge or transaction identifier.
+
+```dart
+final attestation = FlutterDefenderAttestation.instance;
+
+await attestation.preparePlayIntegrity(
+  cloudProjectNumber: 123456789,
+);
+
+final integrityToken = await attestation.requestPlayIntegrityToken(
+  requestHash: canonicalRequestHash,
+);
+
+// Send integrityToken and the original request to the host app's backend.
+```
+
+The backend must ask Google to decode the token, verify the package and signing
+certificate, compare `requestHash`, evaluate app/device integrity verdicts, and
+then allow, restrict, or reject the operation. Never ship Google service-account
+credentials in the app.
+
+The `requestHash` is limited to 500 UTF-8 bytes. Send a digest such as SHA-256,
+not sensitive request data. Standard tokens have replay protection, but the
+backend must still bind each token to the expected user, operation, and fresh
+server challenge. Warm-up calls contact Google, can take several seconds, and
+are limited to five calls per app instance per minute. If Google reports that
+the prepared token provider is invalid, call `preparePlayIntegrity` again before
+requesting another token. See the
+[standard request guide](https://developer.android.com/google/play/integrity/standard)
+for the full client/server flow and retry guidance.
+
+iOS setup:
+
+1. Enable the App Attest capability and configure the
+   [`com.apple.developer.devicecheck.appattest-environment`](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.developer.devicecheck.appattest-environment)
+   entitlement in the host app.
+2. Generate one key per user account per installation and persist its key ID.
+3. Attest that key once using a fresh server challenge.
+4. Generate an assertion over a fresh, canonical request hash for later
+   sensitive operations.
+
+```dart
+final attestation = FlutterDefenderAttestation.instance;
+
+if (await attestation.isAppAttestSupported()) {
+  final keyId = await attestation.generateAppAttestKey();
+  final attestationObject = await attestation.attestAppAttestKey(
+    keyId: keyId,
+    clientDataHash: sha256ClientDataHash,
+  );
+
+  // After the backend accepts enrollment:
+  final assertion = await attestation.generateAppAttestAssertion(
+    keyId: keyId,
+    clientDataHash: nextSha256ClientDataHash,
+  );
+}
+```
+
+`clientDataHash` must contain exactly 32 SHA-256 bytes and must bind a unique
+server challenge of at least 16 random bytes to the canonical operation data.
+The backend must validate
+Apple's certificate chain, nonce, app identity, public key, signature, and
+monotonically increasing assertion counter.
+
+Persist the key identifier because Apple does not provide a way to recover it.
+If key attestation fails with Apple's `serverUnavailable` error, retry later
+with the same key and the same hash. For other attestation errors, discard the
+identifier and enroll a new key. Development and production App Attest keys are
+not interchangeable; TestFlight and App Store builds use production. Keys do
+not survive app reinstall, device migration, or backup restoration. Follow
+Apple's
+[App Attest client guide](https://developer.apple.com/documentation/devicecheck/establishing-your-app-s-integrity)
+and
+[server validation guide](https://developer.apple.com/documentation/devicecheck/validating-apps-that-connect-to-your-server).
+
+Unsupported devices and transient platform/network failures should enter an
+explicit limited or step-up policy. Invalid signatures, identities, request
+hashes, or replay evidence should cause the backend to reject the sensitive
+operation.
+
+Native failures surface as `PlatformException`. Use the stable codes
+`play-integrity`, `play-integrity-state`, `play-integrity-unavailable`,
+`app-attest`, and `unsupported-platform` for policy routing. On Android,
+`play-integrity` exposes Google's numeric `StandardIntegrityErrorCode` in
+`details`; retry only the transient codes documented by Google.
 
 ### Root / Jailbreak Detection
 
@@ -442,7 +549,7 @@ This repository includes GitHub Actions for CI and publishing:
   changelog entry use the same version.
 - Pushes to `main` / `master` rerun those checks, verify that `pubspec.yaml`
   contains a version higher than the previous branch tip, and then create a
-  matching Git tag such as `v0.6.2`.
+  matching Git tag such as `v0.7.0`.
 - Pushing that tag triggers the publish workflow, which reruns the full
   analyze/test gate (package, example, and native known-answer tests), checks
   that the tag matches the `pubspec.yaml` version, and only then runs

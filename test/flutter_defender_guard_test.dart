@@ -77,6 +77,31 @@ class FakeFlutterDefenderPlatform
       advancedSecuritySignals;
 
   @override
+  Future<void> preparePlayIntegrity(int cloudProjectNumber) async {}
+
+  @override
+  Future<String> requestPlayIntegrityToken(String requestHash) async =>
+      'integrity-token';
+
+  @override
+  Future<bool> isAppAttestSupported() async => false;
+
+  @override
+  Future<String> generateAppAttestKey() async => 'app-attest-key';
+
+  @override
+  Future<Uint8List> attestAppAttestKey({
+    required String keyId,
+    required Uint8List clientDataHash,
+  }) async => Uint8List(0);
+
+  @override
+  Future<Uint8List> generateAppAttestAssertion({
+    required String keyId,
+    required Uint8List clientDataHash,
+  }) async => Uint8List(0);
+
+  @override
   Future<pigeon.LifecycleSnapshot> loadLifecycleSnapshot() async {
     if (loadLifecycleSnapshotDelay == Duration.zero) {
       return lifecycleSnapshot;

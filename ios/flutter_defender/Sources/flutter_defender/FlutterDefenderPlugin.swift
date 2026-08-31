@@ -497,6 +497,7 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
   private let userDefaults: UserDefaults
   private let flutterApi: DefenderFlutterApiProtocol
   private let securityDetector: IosAdvancedSecurityDetector
+  private let appAttestProvider: AppAttestProvider
   private let secureStorageHelper: IosSecureStorageHelper
   private let secureSurfaceController: IosSecureSurfaceController
   private let detectorQueue = DispatchQueue(
@@ -543,6 +544,7 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
     self.isEmulatorProvider = isEmulatorProvider
     self.flutterApi = DefenderFlutterApi(binaryMessenger: binaryMessenger)
     self.securityDetector = IosAdvancedSecurityDetector()
+    self.appAttestProvider = AppAttestProvider()
     self.secureStorageHelper = IosSecureStorageHelper()
     self.secureSurfaceController = IosSecureSurfaceController()
     super.init()
@@ -599,6 +601,96 @@ public final class FlutterDefenderPlugin: NSObject, FlutterPlugin, DefenderHostA
       DispatchQueue.main.async {
         completion(.success(signals))
       }
+    }
+  }
+
+  func preparePlayIntegrity(
+    cloudProjectNumber: Int64,
+    completion: @escaping (Result<Void, Error>) -> Void
+  ) {
+    completion(
+      .failure(
+        PigeonError(
+          code: "unsupported-platform",
+          message: "Play Integrity is only available on Android.",
+          details: nil
+        )
+      )
+    )
+  }
+
+  func requestPlayIntegrityToken(
+    requestHash: String,
+    completion: @escaping (Result<String, Error>) -> Void
+  ) {
+    completion(
+      .failure(
+        PigeonError(
+          code: "unsupported-platform",
+          message: "Play Integrity is only available on Android.",
+          details: nil
+        )
+      )
+    )
+  }
+
+  func isAppAttestSupported() throws -> Bool {
+    appAttestProvider.isSupported
+  }
+
+  func generateAppAttestKey(completion: @escaping (Result<String, Error>) -> Void) {
+    appAttestProvider.generateKey { result in
+      self.completeAppAttest(result, completion: completion)
+    }
+  }
+
+  func attestAppAttestKey(
+    keyId: String,
+    clientDataHash: FlutterStandardTypedData,
+    completion: @escaping (Result<FlutterStandardTypedData, Error>) -> Void
+  ) {
+    appAttestProvider.attestKey(keyId: keyId, clientDataHash: clientDataHash.data) { result in
+      self.completeAppAttest(
+        result.map { FlutterStandardTypedData(bytes: $0) },
+        completion: completion
+      )
+    }
+  }
+
+  func generateAppAttestAssertion(
+    keyId: String,
+    clientDataHash: FlutterStandardTypedData,
+    completion: @escaping (Result<FlutterStandardTypedData, Error>) -> Void
+  ) {
+    appAttestProvider.generateAssertion(
+      keyId: keyId,
+      clientDataHash: clientDataHash.data
+    ) { result in
+      self.completeAppAttest(
+        result.map { FlutterStandardTypedData(bytes: $0) },
+        completion: completion
+      )
+    }
+  }
+
+  private func completeAppAttest<T>(
+    _ result: Result<T, Error>,
+    completion: @escaping (Result<T, Error>) -> Void
+  ) {
+    switch result {
+    case .success(let value):
+      completion(.success(value))
+    case .failure(let error):
+      let nativeError = error as NSError
+      completion(
+        .failure(
+          PigeonError(
+            code: "app-attest",
+            message: error.localizedDescription,
+            details: "\(nativeError.domain):\(nativeError.code)"
+          )
+        )
+      )
     }
   }
 
