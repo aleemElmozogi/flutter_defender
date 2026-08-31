@@ -6,6 +6,7 @@ add_library(flutter_defender SHARED
     ../src/native/src/ffi/defender_core.cpp
     ../src/native/src/crypto/defender_crypto.cpp
     ../src/native/src/platform/defender_platform.cpp
+    ../src/native/src/platform/android/android_emulator_classifier.cpp
     ../src/native/src/platform/android/defender_android.cpp)
 
 target_compile_features(flutter_defender PRIVATE cxx_std_17)

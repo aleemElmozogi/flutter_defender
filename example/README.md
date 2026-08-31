@@ -60,6 +60,6 @@ RUN_IOS_INTEGRATION=0 ./tool/run_tests.sh
 6. Sign in, open **Authenticated Area**, background for less than 20 seconds, then repeat for more than 20 seconds and confirm logout is requested.
 7. Open **Custom Blocking Screen Demo** and verify the underlying route is not tappable while blocked.
 8. Apply the advanced security profiles and validate expected blocking behavior on matching device/network conditions.
-9. On Android, configure `ReleaseEmulatorGuardActivity` as the launcher, build a release APK, install it on an emulator, and verify launch is blocked before Flutter screens load.
+9. On Android, build a release APK with the configured `ReleaseEmulatorGuardActivity`, install it on an emulator, and verify launch is blocked before Flutter screens load.
 10. On Android, run debug/profile builds on an emulator and verify they remain usable.
 11. On iOS, run `flutter build ios --simulator --release` and verify Flutter rejects the build with `Release mode is not supported for simulators.`

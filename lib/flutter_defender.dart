@@ -19,6 +19,7 @@ import 'src/ui/flutter_defender_ui_theme.dart';
 
 export 'flutter_defender_localization_support.dart';
 export 'l10n/flutter_defender_localizations.dart';
+export 'src/attestation/flutter_defender_attestation.dart';
 export 'src/network/flutter_defender_request_signer.dart';
 export 'src/ui/blocking_screen.dart';
 export 'src/ui/flutter_defender_message_id.dart';

@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-08-31
+
+### Added
+
+- Added server-verifiable Play Integrity standard-token preparation and request APIs for Android.
+- Added App Attest availability, key generation, key attestation, and assertion APIs for iOS.
+- Documented the backend verification boundary, challenge binding, platform configuration, retry behavior, and key lifecycle.
+
+### Changed
+
+- Reorganized the package documentation around a concise quick start with focused guides for Android launch protection, attestation, security boundaries, and release maintenance.
+- Split the iOS plugin implementation into focused detector, secure-storage, secure-surface, attestation, and plugin-wiring files.
+- Kept Pigeon outputs committed for package consumers, marked them as generated for code review, and added a reproducible generation command plus CI drift checks.
+
+### Security
+
+- Play Integrity request hashes are validated against Google's 500-byte limit, stale concurrent warm-ups cannot replace the latest provider, and invalid providers are discarded before reuse.
+- App Attest inputs and returned keys, attestations, and assertions are validated before crossing the public API boundary.
+
+### Tests
+
+- Added Dart facade coverage and Android provider tests for validation, concurrent warm-ups, invalid-provider recovery, and empty artifacts.
+
+## [0.6.2] - 2026-08-31
+
+### Fixed
+
+- Android emulator classification now recognizes MEmu identities exposed through `MEmu`, `Microvirt`, and `vbox86` build properties in both Kotlin and native detection paths.
+- The Android launcher-guard setup now keeps the Flutter target activity non-exported and documents the direct-launch bypass risk.
+
+### Tests
+
+- Added Kotlin and native C++ regression coverage for MEmu, standard Android Virtual Device, and physical-device build identities.
+- Configured the example app to exercise the native launcher guard with exactly one launcher activity.
+
 ## [0.6.1] - 2026-07-17
 
 ### Fixed

@@ -403,6 +403,12 @@ interface DefenderHostApi {
   fun setProtectionState(secureActive: Boolean, overlayHardeningActive: Boolean)
   fun getRuntimeState(): NativeRuntimeState
   fun getAdvancedSecuritySignals(callback: (Result<AdvancedSecuritySignals>) -> Unit)
+  fun preparePlayIntegrity(cloudProjectNumber: Long, callback: (Result<Unit>) -> Unit)
+  fun requestPlayIntegrityToken(requestHash: String, callback: (Result<String>) -> Unit)
+  fun isAppAttestSupported(): Boolean
+  fun generateAppAttestKey(callback: (Result<String>) -> Unit)
+  fun attestAppAttestKey(keyId: String, clientDataHash: ByteArray, callback: (Result<ByteArray>) -> Unit)
+  fun generateAppAttestAssertion(keyId: String, clientDataHash: ByteArray, callback: (Result<ByteArray>) -> Unit)
   fun secureWrite(key: String, value: String, callback: (Result<Unit>) -> Unit)
   fun secureRead(key: String, callback: (Result<String?>) -> Unit)
   fun secureDelete(key: String, callback: (Result<Unit>) -> Unit)
@@ -459,6 +465,120 @@ interface DefenderHostApi {
         if (api != null) {
           channel.setMessageHandler { _, reply ->
             api.getAdvancedSecuritySignals{ result: Result<AdvancedSecuritySignals> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(DefenderMessagesPigeonUtils.wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(DefenderMessagesPigeonUtils.wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.flutter_defender.DefenderHostApi.preparePlayIntegrity$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val cloudProjectNumberArg = args[0] as Long
+            api.preparePlayIntegrity(cloudProjectNumberArg) { result: Result<Unit> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(DefenderMessagesPigeonUtils.wrapError(error))
+              } else {
+                reply.reply(DefenderMessagesPigeonUtils.wrapResult(null))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.flutter_defender.DefenderHostApi.requestPlayIntegrityToken$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val requestHashArg = args[0] as String
+            api.requestPlayIntegrityToken(requestHashArg) { result: Result<String> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(DefenderMessagesPigeonUtils.wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(DefenderMessagesPigeonUtils.wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.flutter_defender.DefenderHostApi.isAppAttestSupported$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            val wrapped: List<Any?> = try {
+              listOf(api.isAppAttestSupported())
+            } catch (exception: Throwable) {
+              DefenderMessagesPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.flutter_defender.DefenderHostApi.generateAppAttestKey$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            api.generateAppAttestKey{ result: Result<String> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(DefenderMessagesPigeonUtils.wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(DefenderMessagesPigeonUtils.wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.flutter_defender.DefenderHostApi.attestAppAttestKey$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val keyIdArg = args[0] as String
+            val clientDataHashArg = args[1] as ByteArray
+            api.attestAppAttestKey(keyIdArg, clientDataHashArg) { result: Result<ByteArray> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(DefenderMessagesPigeonUtils.wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(DefenderMessagesPigeonUtils.wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.flutter_defender.DefenderHostApi.generateAppAttestAssertion$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val keyIdArg = args[0] as String
+            val clientDataHashArg = args[1] as ByteArray
+            api.generateAppAttestAssertion(keyIdArg, clientDataHashArg) { result: Result<ByteArray> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(DefenderMessagesPigeonUtils.wrapError(error))
@@ -622,7 +742,7 @@ class DefenderFlutterApi(private val binaryMessenger: BinaryMessenger, private v
         }
       } else {
         callback(Result.failure(DefenderMessagesPigeonUtils.createConnectionError(channelName)))
-      } 
+      }
     }
   }
   fun onScreenCaptureChanged(activeArg: Boolean, callback: (Result<Unit>) -> Unit)
@@ -639,7 +759,7 @@ class DefenderFlutterApi(private val binaryMessenger: BinaryMessenger, private v
         }
       } else {
         callback(Result.failure(DefenderMessagesPigeonUtils.createConnectionError(channelName)))
-      } 
+      }
     }
   }
   fun onOverlayViolation(callback: (Result<Unit>) -> Unit)
@@ -656,7 +776,7 @@ class DefenderFlutterApi(private val binaryMessenger: BinaryMessenger, private v
         }
       } else {
         callback(Result.failure(DefenderMessagesPigeonUtils.createConnectionError(channelName)))
-      } 
+      }
     }
   }
   fun onOverlayCleared(callback: (Result<Unit>) -> Unit)
@@ -690,7 +810,7 @@ class DefenderFlutterApi(private val binaryMessenger: BinaryMessenger, private v
         }
       } else {
         callback(Result.failure(DefenderMessagesPigeonUtils.createConnectionError(channelName)))
-      } 
+      }
     }
   }
   fun onWindowFocusChanged(hasFocusArg: Boolean, callback: (Result<Unit>) -> Unit)
@@ -707,7 +827,7 @@ class DefenderFlutterApi(private val binaryMessenger: BinaryMessenger, private v
         }
       } else {
         callback(Result.failure(DefenderMessagesPigeonUtils.createConnectionError(channelName)))
-      } 
+      }
     }
   }
 }

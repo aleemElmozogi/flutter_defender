@@ -32,6 +32,9 @@ jobs:
       - name: Install dependencies (package)
         run: flutter pub get
 
+      - name: Verify generated platform channels
+        run: ./tool/generate_pigeon.sh --check
+
       - name: Verify Android root-indicator parity
         run: python3 tool/check_android_root_path_parity.py
 
@@ -40,6 +43,15 @@ jobs:
 
       - name: Run package tests
         run: flutter test
+
+      - name: Run native Android emulator classifier tests
+        run: |
+          c++ -std=c++17 -Wall -Wextra -Werror \
+            -I src/native/src/platform/android \
+            src/native/src/platform/android/android_emulator_classifier.cpp \
+            test/native/android_emulator_classifier_test.cpp \
+            -o /tmp/flutter_defender_emulator_test
+          /tmp/flutter_defender_emulator_test
 
       - name: Run native HMAC-SHA256 known-answer tests
         run: |
@@ -61,6 +73,14 @@ jobs:
       - name: Run example tests
         working-directory: example
         run: flutter test
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14'
+
+      - name: Run Android plugin unit tests
+        run: gradle --project-dir example/android :flutter_defender:testDebugUnitTest
 
       - name: Extract current version
         id: current_version

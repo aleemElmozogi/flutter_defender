@@ -46,6 +46,23 @@ abstract class DefenderHostApi {
   AdvancedSecuritySignals getAdvancedSecuritySignals();
 
   @async
+  void preparePlayIntegrity(int cloudProjectNumber);
+
+  @async
+  String requestPlayIntegrityToken(String requestHash);
+
+  bool isAppAttestSupported();
+
+  @async
+  String generateAppAttestKey();
+
+  @async
+  Uint8List attestAppAttestKey(String keyId, Uint8List clientDataHash);
+
+  @async
+  Uint8List generateAppAttestAssertion(String keyId, Uint8List clientDataHash);
+
+  @async
   void secureWrite(String key, String value);
 
   @async

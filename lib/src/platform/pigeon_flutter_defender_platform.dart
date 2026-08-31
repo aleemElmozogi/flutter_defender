@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../../flutter_defender_platform_interface.dart';
 import 'pigeon/defender_messages.g.dart';
 
@@ -61,6 +63,42 @@ class PigeonFlutterDefenderPlatform extends FlutterDefenderPlatform {
   @override
   Future<AdvancedSecuritySignals> getAdvancedSecuritySignals() {
     return _hostApi.getAdvancedSecuritySignals();
+  }
+
+  @override
+  Future<void> preparePlayIntegrity(int cloudProjectNumber) {
+    return _hostApi.preparePlayIntegrity(cloudProjectNumber);
+  }
+
+  @override
+  Future<String> requestPlayIntegrityToken(String requestHash) {
+    return _hostApi.requestPlayIntegrityToken(requestHash);
+  }
+
+  @override
+  Future<bool> isAppAttestSupported() {
+    return _hostApi.isAppAttestSupported();
+  }
+
+  @override
+  Future<String> generateAppAttestKey() {
+    return _hostApi.generateAppAttestKey();
+  }
+
+  @override
+  Future<Uint8List> attestAppAttestKey({
+    required String keyId,
+    required Uint8List clientDataHash,
+  }) {
+    return _hostApi.attestAppAttestKey(keyId, clientDataHash);
+  }
+
+  @override
+  Future<Uint8List> generateAppAttestAssertion({
+    required String keyId,
+    required Uint8List clientDataHash,
+  }) {
+    return _hostApi.generateAppAttestAssertion(keyId, clientDataHash);
   }
 
   @override
