@@ -31,8 +31,26 @@ dependencies:
 
 `enableEmulatorDetectionRelease` blocks guarded Flutter screens in release
 builds. If you need the stricter policy where a release APK is blocked before
-Flutter starts, make the package guard activity your Android launcher and point
-it at your real Flutter activity:
+Flutter starts, first edit the existing `.MainActivity` declaration in place.
+Set `android:exported="false"`, keep its remaining attributes and metadata, and
+delete this entire launcher intent filter from it:
+
+```xml
+<intent-filter>
+    <action android:name="android.intent.action.MAIN" />
+    <category android:name="android.intent.category.LAUNCHER" />
+</intent-filter>
+```
+
+Do not add another `.MainActivity` declaration or leave it exported. During
+manifest merging, activities match by `android:name`, and an additional
+declaration without the filter does not remove the filter from the existing
+declaration. A directly exported target activity can also bypass the launcher
+guard. If `.MainActivity` currently handles external deep links, it needs a
+separate guarded routing design; do not silently remove those filters.
+
+Then add the package guard activity as a sibling of `.MainActivity` inside the
+same `<application>` element and point it at the real Flutter activity:
 
 ```xml
 <activity
@@ -67,12 +85,6 @@ it at your real Flutter activity:
         <category android:name="android.intent.category.LAUNCHER" />
     </intent-filter>
 </activity>
-
-<!-- Keep your existing MainActivity settings, but remove MAIN/LAUNCHER from it. -->
-<activity
-    android:name=".MainActivity"
-    android:exported="false"
-    android:theme="@style/LaunchTheme" />
 ```
 
 No Gradle change is required. Debug and profile builds remain runnable on
@@ -82,7 +94,12 @@ emulator, so this is launch-time enforcement rather than install prevention. If
 your manifest does not already define it, add
 `xmlns:tools="http://schemas.android.com/tools"` to the root `<manifest>` tag.
 If `TARGET_ACTIVITY` is wrong, the native guard shows a configuration error and
-logs the missing activity instead of crashing.
+logs the missing activity instead of crashing. In Android Studio's **Merged
+Manifest** view, confirm that
+`aleem.flutter.defender.ReleaseEmulatorGuardActivity` is the only activity with
+the `MAIN` and `LAUNCHER` pair, and that `.MainActivity` is not exported. Two
+launcher activities produce two icons, while an exported target can be started
+without passing through the native guard.
 
 ## Quick Start
 

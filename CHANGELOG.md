@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Android emulator classification now recognizes MEmu identities exposed through `MEmu`, `Microvirt`, and `vbox86` build properties in both Kotlin and native detection paths.
+- The Android launcher-guard setup now keeps the Flutter target activity non-exported and documents the direct-launch bypass risk.
+
+### Tests
+
+- Added Kotlin and native C++ regression coverage for MEmu, standard Android Virtual Device, and physical-device build identities.
+- Configured the example app to exercise the native launcher guard with exactly one launcher activity.
+
 ## [0.5.0] - 2026-07-07
 
 ### Added

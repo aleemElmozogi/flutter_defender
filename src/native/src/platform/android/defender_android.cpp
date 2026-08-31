@@ -1,4 +1,5 @@
 #include "../platform_detector_internal.h"
+#include "android_emulator_classifier.h"
 
 #if defined(__ANDROID__)
 
@@ -133,25 +134,15 @@ bool IsRootedOrJailbrokenImpl() {
 }
 
 bool IsEmulatorImpl() {
-  const std::string fingerprint = AndroidProperty("ro.build.fingerprint");
-  const std::string model = AndroidProperty("ro.product.model");
-  const std::string manufacturer = AndroidProperty("ro.product.manufacturer");
-  const std::string brand = AndroidProperty("ro.product.brand");
-  const std::string device = AndroidProperty("ro.product.device");
-  const std::string product = AndroidProperty("ro.product.name");
-  const std::string hardware = AndroidProperty("ro.hardware");
-
-  return HasPrefix(fingerprint, "generic") ||
-         HasPrefix(fingerprint, "unknown") ||
-         ContainsCaseInsensitive(model, "google_sdk") ||
-         ContainsCaseInsensitive(model, "emulator") ||
-         ContainsCaseInsensitive(model, "Android SDK built for x86") ||
-         ContainsCaseInsensitive(manufacturer, "Genymotion") ||
-         (HasPrefix(brand, "generic") && HasPrefix(device, "generic")) ||
-         product == "google_sdk" || ContainsCaseInsensitive(product, "sdk") ||
-         ContainsCaseInsensitive(product, "emulator") ||
-         ContainsCaseInsensitive(hardware, "goldfish") ||
-         ContainsCaseInsensitive(hardware, "ranchu");
+  return IsAndroidEmulator(AndroidBuildIdentity{
+      AndroidProperty("ro.build.fingerprint"),
+      AndroidProperty("ro.product.model"),
+      AndroidProperty("ro.product.manufacturer"),
+      AndroidProperty("ro.product.brand"),
+      AndroidProperty("ro.product.device"),
+      AndroidProperty("ro.product.name"),
+      AndroidProperty("ro.hardware"),
+  });
 }
 
 bool IsTamperedImpl() {
