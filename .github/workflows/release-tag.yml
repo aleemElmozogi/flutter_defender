@@ -11,6 +11,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
+  actions: write
   contents: write
 
 jobs:
@@ -126,8 +127,6 @@ jobs:
 
       - name: Verify or create release tag
         if: steps.release_status.outputs.required == 'true'
-        env:
-          RELEASE_TAG_TOKEN: ${{ secrets.RELEASE_TAG_TOKEN }}
         run: |
           tag="v${{ steps.current_version.outputs.value }}"
           if git rev-parse "$tag" >/dev/null 2>&1; then
@@ -135,11 +134,15 @@ jobs:
             echo "Tag $tag already points to release commit $tagged_sha."
             exit 0
           fi
-          if [ -z "$RELEASE_TAG_TOKEN" ]; then
-            echo "Missing RELEASE_TAG_TOKEN secret." >&2
-            exit 1
-          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag "$tag" "$GITHUB_SHA"
-          git push "https://x-access-token:${RELEASE_TAG_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$tag"
+          git push origin "$tag"
+
+      - name: Dispatch publish workflow
+        if: steps.release_status.outputs.required == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v${{ steps.current_version.outputs.value }}"
+          gh workflow run publish.yml --ref "$tag"
