@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added App Attest availability, key generation, key attestation, and assertion APIs for iOS.
 - Documented the backend verification boundary, challenge binding, platform configuration, retry behavior, and key lifecycle.
 
+### Changed
+
+- Reorganized the package documentation around a concise quick start with focused guides for Android launch protection, attestation, security boundaries, and release maintenance.
+
 ### Security
 
 - Play Integrity request hashes are validated against Google's 500-byte limit, stale concurrent warm-ups cannot replace the latest provider, and invalid providers are discarded before reuse.
