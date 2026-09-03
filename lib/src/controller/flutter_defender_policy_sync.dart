@@ -114,6 +114,17 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
     // so screenshots and screen sharing are not blocked.
     final bool nativeProtectionWanted =
         hasGuards && !_config.ignoreScreenBlocking;
+    if (!nativeProtectionWanted && _runtime.nativeProtectionActive) {
+      await _safeSetProtectionState(
+        secureActive: false,
+        overlayHardeningActive: false,
+      );
+      if (generation != _syncGeneration) {
+        return;
+      }
+      _runtime.nativeProtectionActive = false;
+    }
+
     final bool needsProtectionWarmup =
         concealUntilProtectionReady &&
         nativeProtectionWanted &&

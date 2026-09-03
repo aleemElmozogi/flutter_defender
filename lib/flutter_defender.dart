@@ -172,7 +172,7 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
     bool enableSecureStorageHelper = false,
     bool clearSecureStorageOnLogout = false,
     bool failClosedOnPlatformError = false,
-    bool ignoreScreenBlocking = !kReleaseMode,
+    bool ignoreScreenBlocking = false,
     Widget Function(String message)? blockingScreenBuilder,
     VoidCallback? onLogoutRequested,
     VoidCallback? onRootDetected,

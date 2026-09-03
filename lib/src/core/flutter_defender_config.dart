@@ -16,7 +16,7 @@ class FlutterDefenderConfig {
     this.enableSecureStorageHelper = false,
     this.clearSecureStorageOnLogout = false,
     this.failClosedOnPlatformError = false,
-    this.ignoreScreenBlocking = !kReleaseMode,
+    this.ignoreScreenBlocking = false,
     this.blockingScreenBuilder,
     this.onLogoutRequested,
     this.onRootDetected,

@@ -280,6 +280,36 @@ void main() {
     expect(fakePlatform.protectionCalls, isNot(contains((true, true))));
   });
 
+  testWidgets(
+    'switching ignoreScreenBlocking on while a guard is active disables native protection',
+    (WidgetTester tester) async {
+      defender.dispose();
+      defender = FlutterDefender.instance;
+      await defender.init(ignoreScreenBlocking: false);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: FlutterDefenderSensitiveGuard(
+            child: Scaffold(body: Text('secure')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Native protection should be active initially.
+      expect(fakePlatform.protectionCalls, contains((true, true)));
+      expect(fakePlatform.protectionCalls.last, equals((true, true)));
+
+      // Re-initialize with ignoreScreenBlocking: true while the guard is still active.
+      await defender.init(ignoreScreenBlocking: true);
+      await tester.pumpAndSettle();
+
+      expect(defender.screenBlockingIgnored, isTrue);
+      // Explicitly disabled via setProtectionState(false, false).
+      expect(fakePlatform.protectionCalls.last, equals((false, false)));
+    },
+  );
+
   testWidgets('strict platform failure policy blocks guarded content', (
     WidgetTester tester,
   ) async {
@@ -849,10 +879,7 @@ void main() {
   ) async {
     defender.dispose();
     defender = FlutterDefender.instance;
-    await defender.init(
-      enableRaspDetection: true,
-      ignoreScreenBlocking: false,
-    );
+    await defender.init(enableRaspDetection: true, ignoreScreenBlocking: false);
     fakePlatform.advancedSecuritySignals = pigeon.AdvancedSecuritySignals(
       rootedOrJailbroken: false,
       proxyEnabled: false,
