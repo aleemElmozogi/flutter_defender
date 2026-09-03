@@ -388,6 +388,12 @@ protocol DefenderHostApi {
   func setProtectionState(secureActive: Bool, overlayHardeningActive: Bool) throws
   func getRuntimeState() throws -> NativeRuntimeState
   func getAdvancedSecuritySignals(completion: @escaping (Result<AdvancedSecuritySignals, Error>) -> Void)
+  func preparePlayIntegrity(cloudProjectNumber: Int64, completion: @escaping (Result<Void, Error>) -> Void)
+  func requestPlayIntegrityToken(requestHash: String, completion: @escaping (Result<String, Error>) -> Void)
+  func isAppAttestSupported() throws -> Bool
+  func generateAppAttestKey(completion: @escaping (Result<String, Error>) -> Void)
+  func attestAppAttestKey(keyId: String, clientDataHash: FlutterStandardTypedData, completion: @escaping (Result<FlutterStandardTypedData, Error>) -> Void)
+  func generateAppAttestAssertion(keyId: String, clientDataHash: FlutterStandardTypedData, completion: @escaping (Result<FlutterStandardTypedData, Error>) -> Void)
   func secureWrite(key: String, value: String, completion: @escaping (Result<Void, Error>) -> Void)
   func secureRead(key: String, completion: @escaping (Result<String?, Error>) -> Void)
   func secureDelete(key: String, completion: @escaping (Result<Void, Error>) -> Void)
@@ -446,6 +452,104 @@ class DefenderHostApiSetup {
       }
     } else {
       getAdvancedSecuritySignalsChannel.setMessageHandler(nil)
+    }
+    let preparePlayIntegrityChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.flutter_defender.DefenderHostApi.preparePlayIntegrity\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      preparePlayIntegrityChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let cloudProjectNumberArg = args[0] as! Int64
+        api.preparePlayIntegrity(cloudProjectNumber: cloudProjectNumberArg) { result in
+          switch result {
+          case .success:
+            reply(wrapResult(nil))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      preparePlayIntegrityChannel.setMessageHandler(nil)
+    }
+    let requestPlayIntegrityTokenChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.flutter_defender.DefenderHostApi.requestPlayIntegrityToken\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      requestPlayIntegrityTokenChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let requestHashArg = args[0] as! String
+        api.requestPlayIntegrityToken(requestHash: requestHashArg) { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      requestPlayIntegrityTokenChannel.setMessageHandler(nil)
+    }
+    let isAppAttestSupportedChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.flutter_defender.DefenderHostApi.isAppAttestSupported\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      isAppAttestSupportedChannel.setMessageHandler { _, reply in
+        do {
+          let result = try api.isAppAttestSupported()
+          reply(wrapResult(result))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      isAppAttestSupportedChannel.setMessageHandler(nil)
+    }
+    let generateAppAttestKeyChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.flutter_defender.DefenderHostApi.generateAppAttestKey\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      generateAppAttestKeyChannel.setMessageHandler { _, reply in
+        api.generateAppAttestKey { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      generateAppAttestKeyChannel.setMessageHandler(nil)
+    }
+    let attestAppAttestKeyChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.flutter_defender.DefenderHostApi.attestAppAttestKey\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      attestAppAttestKeyChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let keyIdArg = args[0] as! String
+        let clientDataHashArg = args[1] as! FlutterStandardTypedData
+        api.attestAppAttestKey(keyId: keyIdArg, clientDataHash: clientDataHashArg) { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      attestAppAttestKeyChannel.setMessageHandler(nil)
+    }
+    let generateAppAttestAssertionChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.flutter_defender.DefenderHostApi.generateAppAttestAssertion\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      generateAppAttestAssertionChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let keyIdArg = args[0] as! String
+        let clientDataHashArg = args[1] as! FlutterStandardTypedData
+        api.generateAppAttestAssertion(keyId: keyIdArg, clientDataHash: clientDataHashArg) { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      generateAppAttestAssertionChannel.setMessageHandler(nil)
     }
     let secureWriteChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.flutter_defender.DefenderHostApi.secureWrite\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {

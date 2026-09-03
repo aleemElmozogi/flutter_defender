@@ -50,6 +50,24 @@ abstract class FlutterDefenderPlatform extends PlatformInterface {
 
   Future<AdvancedSecuritySignals> getAdvancedSecuritySignals();
 
+  Future<void> preparePlayIntegrity(int cloudProjectNumber);
+
+  Future<String> requestPlayIntegrityToken(String requestHash);
+
+  Future<bool> isAppAttestSupported();
+
+  Future<String> generateAppAttestKey();
+
+  Future<Uint8List> attestAppAttestKey({
+    required String keyId,
+    required Uint8List clientDataHash,
+  });
+
+  Future<Uint8List> generateAppAttestAssertion({
+    required String keyId,
+    required Uint8List clientDataHash,
+  });
+
   Future<void> secureWrite({required String key, required String value});
 
   Future<String?> secureRead(String key);

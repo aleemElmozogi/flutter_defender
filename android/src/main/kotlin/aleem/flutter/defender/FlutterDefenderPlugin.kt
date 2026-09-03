@@ -5,6 +5,7 @@ import android.os.Build
 import android.util.Log
 import android.view.Window
 import android.view.WindowManager
+import com.google.android.play.core.integrity.StandardIntegrityException
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -21,6 +22,7 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
     private var flutterApi: DefenderFlutterApi? = null
     private var snapshotStore: LifecycleSnapshotStore? = null
     private var advancedSecurityDetector: AdvancedSecurityDetector? = null
+    private var playIntegrityProvider: PlayIntegrityProvider? = null
     private var secureStorageHelper: SecureStorageHelper? = null
     private var detectorExecutor: ExecutorService? = null
     private var screenCaptureCallbackHandle: Any? = null
@@ -33,6 +35,7 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         snapshotStore = LifecycleSnapshotStore(binding.applicationContext)
         advancedSecurityDetector = AdvancedSecurityDetector(binding.applicationContext)
+        playIntegrityProvider = PlayIntegrityProvider(binding.applicationContext)
         secureStorageHelper = SecureStorageHelper(binding.applicationContext)
         detectorExecutor = Executors.newSingleThreadExecutor()
         flutterApi = DefenderFlutterApi(binding.binaryMessenger)
@@ -48,6 +51,7 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
         snapshotStore = null
         secureStorageHelper = null
         advancedSecurityDetector = null
+        playIntegrityProvider = null
         detectorExecutor?.shutdown()
         detectorExecutor = null
     }
@@ -90,10 +94,105 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
         runOnWorker(callback) { detector.collectSignals() }
     }
 
+    override fun preparePlayIntegrity(
+        cloudProjectNumber: Long,
+        callback: (Result<Unit>) -> Unit
+    ) {
+        val provider = playIntegrityProvider
+            ?: return callback(
+                Result.failure(
+                    FlutterError(
+                        "play-integrity-unavailable",
+                        "Play Integrity provider is unavailable.",
+                        null
+                    )
+                )
+            )
+        provider.prepare(cloudProjectNumber) { result ->
+            callback(mapPlayIntegrityResult(result))
+        }
+    }
+
+    override fun requestPlayIntegrityToken(
+        requestHash: String,
+        callback: (Result<String>) -> Unit
+    ) {
+        val provider = playIntegrityProvider
+            ?: return callback(
+                Result.failure(
+                    FlutterError(
+                        "play-integrity-unavailable",
+                        "Play Integrity provider is unavailable.",
+                        null
+                    )
+                )
+            )
+        provider.requestToken(requestHash) { result ->
+            callback(mapPlayIntegrityResult(result))
+        }
+    }
+
+    override fun isAppAttestSupported(): Boolean = false
+
+    override fun generateAppAttestKey(callback: (Result<String>) -> Unit) {
+        callback(Result.failure(unsupportedPlatform("App Attest is only available on iOS.")))
+    }
+
+    override fun attestAppAttestKey(
+        keyId: String,
+        clientDataHash: ByteArray,
+        callback: (Result<ByteArray>) -> Unit
+    ) {
+        callback(Result.failure(unsupportedPlatform("App Attest is only available on iOS.")))
+    }
+
+    override fun generateAppAttestAssertion(
+        keyId: String,
+        clientDataHash: ByteArray,
+        callback: (Result<ByteArray>) -> Unit
+    ) {
+        callback(Result.failure(unsupportedPlatform("App Attest is only available on iOS.")))
+    }
+
     override fun secureWrite(key: String, value: String, callback: (Result<Unit>) -> Unit) {
         val helper = secureStorageHelper
             ?: return callback(Result.failure(IllegalStateException("Secure storage is unavailable.")))
         runOnWorker(callback) { helper.write(key, value) }
+    }
+
+    private fun <T> mapPlayIntegrityResult(result: Result<T>): Result<T> {
+        return result.fold(
+            onSuccess = { Result.success(it) },
+            onFailure = { error ->
+                val flutterError = when (error) {
+                    is StandardIntegrityException -> FlutterError(
+                        "play-integrity",
+                        error.message ?: "Play Integrity request failed.",
+                        error.errorCode
+                    )
+                    is IllegalArgumentException -> FlutterError(
+                        "invalid-argument",
+                        error.message,
+                        null
+                    )
+                    is IllegalStateException -> FlutterError(
+                        "play-integrity-state",
+                        error.message,
+                        null
+                    )
+                    else -> FlutterError(
+                        "play-integrity",
+                        error.message ?: error.toString(),
+                        null
+                    )
+                }
+                Result.failure(flutterError)
+            }
+        )
+    }
+
+    private fun unsupportedPlatform(message: String): FlutterError {
+        return FlutterError("unsupported-platform", message, null)
     }
 
     override fun secureRead(key: String, callback: (Result<String?>) -> Unit) {

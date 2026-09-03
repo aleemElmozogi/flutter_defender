@@ -1,0 +1,3 @@
+lib/src/platform/pigeon/defender_messages.g.dart linguist-generated=true
+android/src/main/kotlin/aleem/flutter/defender/DefenderMessages.g.kt linguist-generated=true
+ios/flutter_defender/Sources/flutter_defender/DefenderMessages.g.swift linguist-generated=true

@@ -11,6 +11,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
+  actions: write
   contents: write
 
 jobs:
@@ -32,6 +33,9 @@ jobs:
       - name: Install dependencies (package)
         run: flutter pub get
 
+      - name: Verify generated platform channels
+        run: ./tool/generate_pigeon.sh --check
+
       - name: Verify Android root-indicator parity
         run: python3 tool/check_android_root_path_parity.py
 
@@ -40,6 +44,15 @@ jobs:
 
       - name: Run package tests
         run: flutter test
+
+      - name: Run native Android emulator classifier tests
+        run: |
+          c++ -std=c++17 -Wall -Wextra -Werror \
+            -I src/native/src/platform/android \
+            src/native/src/platform/android/android_emulator_classifier.cpp \
+            test/native/android_emulator_classifier_test.cpp \
+            -o /tmp/flutter_defender_emulator_test
+          /tmp/flutter_defender_emulator_test
 
       - name: Run native HMAC-SHA256 known-answer tests
         run: |
@@ -61,6 +74,14 @@ jobs:
       - name: Run example tests
         working-directory: example
         run: flutter test
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14'
+
+      - name: Run Android plugin unit tests
+        run: gradle --project-dir example/android :flutter_defender:testDebugUnitTest
 
       - name: Extract current version
         id: current_version
@@ -106,8 +127,6 @@ jobs:
 
       - name: Verify or create release tag
         if: steps.release_status.outputs.required == 'true'
-        env:
-          RELEASE_TAG_TOKEN: ${{ secrets.RELEASE_TAG_TOKEN }}
         run: |
           tag="v${{ steps.current_version.outputs.value }}"
           if git rev-parse "$tag" >/dev/null 2>&1; then
@@ -115,11 +134,15 @@ jobs:
             echo "Tag $tag already points to release commit $tagged_sha."
             exit 0
           fi
-          if [ -z "$RELEASE_TAG_TOKEN" ]; then
-            echo "Missing RELEASE_TAG_TOKEN secret." >&2
-            exit 1
-          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag "$tag" "$GITHUB_SHA"
-          git push "https://x-access-token:${RELEASE_TAG_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$tag"
+          git push origin "$tag"
+
+      - name: Dispatch publish workflow
+        if: steps.release_status.outputs.required == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v${{ steps.current_version.outputs.value }}"
+          gh workflow run publish.yml --ref "$tag"
