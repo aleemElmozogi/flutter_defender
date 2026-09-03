@@ -109,21 +109,42 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
       return;
     }
 
+    // When screen blocking is ignored (for example in debug builds), native
+    // hardening such as FLAG_SECURE / the iOS secure surface is never enabled,
+    // so screenshots and screen sharing are not blocked.
+    final bool nativeProtectionWanted =
+        hasGuards && !_config.ignoreScreenBlocking;
+    if (!nativeProtectionWanted && _runtime.nativeProtectionActive) {
+      await _safeSetProtectionState(
+        secureActive: false,
+        overlayHardeningActive: false,
+      );
+      if (generation != _syncGeneration) {
+        return;
+      }
+      _runtime.nativeProtectionActive = false;
+    }
+
     final bool needsProtectionWarmup =
-        concealUntilProtectionReady && !_runtime.nativeProtectionActive;
+        concealUntilProtectionReady &&
+        nativeProtectionWanted &&
+        !_runtime.nativeProtectionActive;
     if (needsProtectionWarmup) {
       _runtime.protectionReady = false;
       _notifyListeners();
     }
 
-    final bool protectionStateSucceeded = await _safeSetProtectionState(
-      secureActive: hasGuards,
-      overlayHardeningActive: hasGuards,
-    );
+    final bool protectionStateSucceeded = nativeProtectionWanted
+        ? await _safeSetProtectionState(
+            secureActive: true,
+            overlayHardeningActive: true,
+          )
+        : true;
     if (generation != _syncGeneration) {
       return;
     }
-    _runtime.nativeProtectionActive = hasGuards && protectionStateSucceeded;
+    _runtime.nativeProtectionActive =
+        nativeProtectionWanted && protectionStateSucceeded;
 
     final bool advancedDetectionEnabled =
         hasGuards &&

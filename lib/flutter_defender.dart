@@ -57,6 +57,7 @@ class _PendingInitRequest {
     required this.enableSecureStorageHelper,
     required this.clearSecureStorageOnLogout,
     required this.failClosedOnPlatformError,
+    required this.ignoreScreenBlocking,
     required this.blockingScreenBuilder,
     required this.onLogoutRequested,
     required this.onRootDetected,
@@ -79,6 +80,7 @@ class _PendingInitRequest {
   final bool enableSecureStorageHelper;
   final bool clearSecureStorageOnLogout;
   final bool failClosedOnPlatformError;
+  final bool ignoreScreenBlocking;
   final Widget Function(String message)? blockingScreenBuilder;
   final VoidCallback? onLogoutRequested;
   final VoidCallback? onRootDetected;
@@ -119,10 +121,17 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
 
   FlutterDefenderPlatform get _platform => FlutterDefenderPlatform.instance;
 
-  bool get hasBlockingOverlay =>
-      _activeGuards.isNotEmpty && _runtime.blockingMessageId.value != null;
+  /// True when [init] was called with `ignoreScreenBlocking`, meaning guarded
+  /// content is never concealed and no blocking overlay is drawn.
+  bool get screenBlockingIgnored => _config.ignoreScreenBlocking;
 
-  bool get shouldConcealGuardedContent => _runtime.shouldConcealGuardedContent;
+  bool get hasBlockingOverlay =>
+      !screenBlockingIgnored &&
+      _activeGuards.isNotEmpty &&
+      _runtime.blockingMessageId.value != null;
+
+  bool get shouldConcealGuardedContent =>
+      !screenBlockingIgnored && _runtime.shouldConcealGuardedContent;
 
   @visibleForTesting
   void debugSetNowProvider(DateTime Function() provider) =>
@@ -142,6 +151,11 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
   /// names are supplied, [authenticatedBackgroundTimeoutSeconds] wins.
   /// Set [failClosedOnPlatformError] to keep guarded content blocked whenever
   /// required native protection or signal calls fail.
+  /// Set [ignoreScreenBlocking] to disable concealment, the blocking screen, and
+  /// native screenshot hardening (FLAG_SECURE / iOS secure surface). Detection
+  /// still runs and callbacks still fire, but guarded content stays visible and
+  /// interactive and screenshots are not blocked. It defaults to `true` in
+  /// debug/profile builds and `false` in release builds.
   Future<void> init({
     int otpBackgroundTimeoutSeconds = 60,
     int? authenticatedBackgroundTimeoutSeconds,
@@ -158,6 +172,7 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
     bool enableSecureStorageHelper = false,
     bool clearSecureStorageOnLogout = false,
     bool failClosedOnPlatformError = false,
+    bool ignoreScreenBlocking = false,
     Widget Function(String message)? blockingScreenBuilder,
     VoidCallback? onLogoutRequested,
     VoidCallback? onRootDetected,
@@ -191,6 +206,7 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
       enableSecureStorageHelper: enableSecureStorageHelper,
       clearSecureStorageOnLogout: clearSecureStorageOnLogout,
       failClosedOnPlatformError: failClosedOnPlatformError,
+      ignoreScreenBlocking: ignoreScreenBlocking,
       blockingScreenBuilder: blockingScreenBuilder,
       onLogoutRequested: onLogoutRequested,
       onRootDetected: onRootDetected,
@@ -236,6 +252,7 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
             enableSecureStorageHelper: request.enableSecureStorageHelper,
             clearSecureStorageOnLogout: request.clearSecureStorageOnLogout,
             failClosedOnPlatformError: request.failClosedOnPlatformError,
+            ignoreScreenBlocking: request.ignoreScreenBlocking,
             blockingScreenBuilder: request.blockingScreenBuilder,
             onLogoutRequested: request.onLogoutRequested,
             onRootDetected: request.onRootDetected,

@@ -176,6 +176,7 @@ abstract class _FlutterDefenderGuardState<T extends StatefulWidget>
         final bool shouldGuard = isRouteCurrent && isRouteActiveInTree;
         _syncGuardRegistration(shouldGuard);
         final bool concealContent =
+            !defender.screenBlockingIgnored &&
             shouldGuard &&
             (!_registrationReady ||
                 defender.shouldConcealGuardedContent ||

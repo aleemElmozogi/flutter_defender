@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../ui/flutter_defender_message_id.dart';
@@ -15,6 +16,7 @@ class FlutterDefenderConfig {
     this.enableSecureStorageHelper = false,
     this.clearSecureStorageOnLogout = false,
     this.failClosedOnPlatformError = false,
+    this.ignoreScreenBlocking = false,
     this.blockingScreenBuilder,
     this.onLogoutRequested,
     this.onRootDetected,
@@ -37,6 +39,7 @@ class FlutterDefenderConfig {
     required bool enableSecureStorageHelper,
     required bool clearSecureStorageOnLogout,
     required bool failClosedOnPlatformError,
+    required bool ignoreScreenBlocking,
     required Widget Function(String message)? blockingScreenBuilder,
     required VoidCallback? onLogoutRequested,
     required VoidCallback? onRootDetected,
@@ -68,6 +71,7 @@ class FlutterDefenderConfig {
       enableSecureStorageHelper: enableSecureStorageHelper,
       clearSecureStorageOnLogout: clearSecureStorageOnLogout,
       failClosedOnPlatformError: failClosedOnPlatformError,
+      ignoreScreenBlocking: ignoreScreenBlocking,
       blockingScreenBuilder: blockingScreenBuilder,
       onLogoutRequested: onLogoutRequested,
       onRootDetected: onRootDetected,
@@ -90,6 +94,12 @@ class FlutterDefenderConfig {
   final bool enableSecureStorageHelper;
   final bool clearSecureStorageOnLogout;
   final bool failClosedOnPlatformError;
+
+  /// When true, guarded content is never concealed and no blocking screen is
+  /// drawn, even when a policy violation is detected. Detection callbacks
+  /// (for example [onRootDetected]) still fire so the host app can react.
+  final bool ignoreScreenBlocking;
+
   final Widget Function(String message)? blockingScreenBuilder;
   final VoidCallback? onLogoutRequested;
   final VoidCallback? onRootDetected;
