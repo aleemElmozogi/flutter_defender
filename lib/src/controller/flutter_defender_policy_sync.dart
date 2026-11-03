@@ -87,7 +87,10 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
     final int generation = ++_syncGeneration;
     final bool hasGuards = _activeGuards.isNotEmpty;
     if (!hasGuards) {
-      if (_runtime.nativeProtectionActive) {
+      if (_runtime.nativeProtectionRequested) {
+        _runtime
+          ..nativeProtectionRequested = false
+          ..nativeProtectionActive = false;
         await _safeSetProtectionState(
           secureActive: false,
           overlayHardeningActive: false,
@@ -95,7 +98,6 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
         if (generation != _syncGeneration) {
           return;
         }
-        _runtime.nativeProtectionActive = false;
       }
       _runtime
         ..platformUnavailableBlocked = false
@@ -109,12 +111,16 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
       return;
     }
 
-    // When screen blocking is ignored (for example in debug builds), native
+    // When screen blocking is ignored (opt-in via `init`), native
     // hardening such as FLAG_SECURE / the iOS secure surface is never enabled,
-    // so screenshots and screen sharing are not blocked.
+    // so screenshots and screen sharing are not blocked. Disabling keys off the
+    // last requested state, so an enable still in flight is overridden too.
     final bool nativeProtectionWanted =
         hasGuards && !_config.ignoreScreenBlocking;
-    if (!nativeProtectionWanted && _runtime.nativeProtectionActive) {
+    if (!nativeProtectionWanted && _runtime.nativeProtectionRequested) {
+      _runtime
+        ..nativeProtectionRequested = false
+        ..nativeProtectionActive = false;
       await _safeSetProtectionState(
         secureActive: false,
         overlayHardeningActive: false,
@@ -122,7 +128,6 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
       if (generation != _syncGeneration) {
         return;
       }
-      _runtime.nativeProtectionActive = false;
     }
 
     final bool needsProtectionWarmup =
@@ -134,6 +139,9 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
       _notifyListeners();
     }
 
+    if (nativeProtectionWanted) {
+      _runtime.nativeProtectionRequested = true;
+    }
     final bool protectionStateSucceeded = nativeProtectionWanted
         ? await _safeSetProtectionState(
             secureActive: true,

@@ -50,6 +50,14 @@ class FakeFlutterDefenderPlatform
   Duration loadLifecycleSnapshotDelay = Duration.zero;
   int secureClearAllCallCount = 0;
 
+  /// Protection state as last applied on the native side.
+  bool nativeSecureActive = false;
+
+  /// When set, the next [setProtectionState] call is held until it completes.
+  /// Later calls queue behind it, matching platform-channel FIFO delivery.
+  Completer<void>? setProtectionStateGate;
+  Future<void>? _pendingProtection;
+
   @override
   Future<void> clearLifecycleSnapshot() async {
     lifecycleSnapshot = pigeon.LifecycleSnapshot(
@@ -132,6 +140,26 @@ class FakeFlutterDefenderPlatform
       throw PlatformException(code: 'protection_state_failure');
     }
     protectionCalls.add((secureActive, overlayHardeningActive));
+    final Completer<void>? gate = setProtectionStateGate;
+    setProtectionStateGate = null;
+    final Future<void>? pending = _pendingProtection;
+    if (gate == null && pending == null) {
+      nativeSecureActive = secureActive;
+      return;
+    }
+    final Future<void> applied = (pending ?? Future<void>.value()).then((
+      _,
+    ) async {
+      if (gate != null) {
+        await gate.future;
+      }
+      nativeSecureActive = secureActive;
+    });
+    _pendingProtection = applied;
+    await applied;
+    if (identical(_pendingProtection, applied)) {
+      _pendingProtection = null;
+    }
   }
 
   @override
@@ -205,8 +233,6 @@ void main() {
     FlutterDefenderPlatform.instance = fakePlatform;
     defender = FlutterDefender.instance;
     defender.debugSetNowProvider(() => now);
-    // Blocking tests opt in explicitly: `init` ignores screen blocking by
-    // default outside release builds.
     await defender.init(ignoreScreenBlocking: false);
   });
 
@@ -307,6 +333,78 @@ void main() {
       expect(defender.screenBlockingIgnored, isTrue);
       // Explicitly disabled via setProtectionState(false, false).
       expect(fakePlatform.protectionCalls.last, equals((false, false)));
+    },
+  );
+
+  testWidgets(
+    'switching ignoreScreenBlocking on while a native enable is pending leaves protection disabled',
+    (WidgetTester tester) async {
+      defender.dispose();
+      defender = FlutterDefender.instance;
+      await defender.init(ignoreScreenBlocking: false);
+      fakePlatform.protectionCalls.clear();
+      final Completer<void> enableGate = Completer<void>();
+      fakePlatform.setProtectionStateGate = enableGate;
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: FlutterDefenderSensitiveGuard(
+            child: Scaffold(body: Text('secure')),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(
+        fakePlatform.protectionCalls,
+        equals(<(bool, bool)>[(true, true)]),
+      );
+      expect(fakePlatform.nativeSecureActive, isFalse);
+
+      unawaited(defender.init(ignoreScreenBlocking: true));
+      await tester.pump();
+      enableGate.complete();
+      await tester.pumpAndSettle();
+
+      expect(defender.screenBlockingIgnored, isTrue);
+      expect(fakePlatform.protectionCalls.last, equals((false, false)));
+      expect(fakePlatform.nativeSecureActive, isFalse);
+      expect(find.text('secure'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'removing the last guard while a native enable is pending leaves protection disabled',
+    (WidgetTester tester) async {
+      defender.dispose();
+      defender = FlutterDefender.instance;
+      await defender.init(ignoreScreenBlocking: true);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: FlutterDefenderSensitiveGuard(
+            child: Scaffold(body: Text('secure')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      fakePlatform.protectionCalls.clear();
+
+      final Completer<void> enableGate = Completer<void>();
+      fakePlatform.setProtectionStateGate = enableGate;
+      unawaited(defender.init(ignoreScreenBlocking: false));
+      await tester.pump();
+      expect(
+        fakePlatform.protectionCalls,
+        equals(<(bool, bool)>[(true, true)]),
+      );
+
+      await tester.pumpWidget(const MaterialApp(home: Text('public')));
+      await tester.pump();
+      enableGate.complete();
+      await tester.pumpAndSettle();
+
+      expect(fakePlatform.protectionCalls.last, equals((false, false)));
+      expect(fakePlatform.nativeSecureActive, isFalse);
     },
   );
 

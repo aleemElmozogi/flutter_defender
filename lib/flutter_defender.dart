@@ -154,8 +154,8 @@ class FlutterDefender with WidgetsBindingObserver implements Listenable {
   /// Set [ignoreScreenBlocking] to disable concealment, the blocking screen, and
   /// native screenshot hardening (FLAG_SECURE / iOS secure surface). Detection
   /// still runs and callbacks still fire, but guarded content stays visible and
-  /// interactive and screenshots are not blocked. It defaults to `true` in
-  /// debug/profile builds and `false` in release builds.
+  /// interactive and screenshots are not blocked. It is opt-in and defaults to
+  /// `false` in every build mode.
   Future<void> init({
     int otpBackgroundTimeoutSeconds = 60,
     int? authenticatedBackgroundTimeoutSeconds,

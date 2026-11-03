@@ -405,7 +405,7 @@ sequenceDiagram
   concealment, the blocking screen, and native hardening (`FLAG_SECURE` / iOS secure
   surface) while keeping detection and callbacks active, giving a grace/debug mode
   without touching the policy engine (`_recomputeBlockingState` still runs and records
-  blocking state; both the UI layer and `_syncProtection` honor the bypass). Defaults
-  to `true` in debug/profile builds and `false` in release builds.
+  blocking state; both the UI layer and `_syncProtection` honor the bypass). Opt-in:
+  defaults to `false` in every build mode.
 - **Cold-start resilience:** `LifecycleSnapshot` (written on background) is replayed on
   launch so an OTP/session timeout can be enforced even after the process was killed.
