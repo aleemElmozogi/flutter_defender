@@ -87,6 +87,8 @@ abstract class _FlutterDefenderGuardState<T extends StatefulWidget>
   final Object _token = Object();
   bool _registrationReady = false;
   bool _guardRegistered = false;
+  bool _guardWanted = false;
+  Future<void>? _guardSync;
   bool? _lastShouldGuard;
 
   FlutterDefender get defender => FlutterDefender.instance;
@@ -99,33 +101,36 @@ abstract class _FlutterDefenderGuardState<T extends StatefulWidget>
 
   bool get showsBlockingOverlay => true;
 
-  Future<void> _register() async {
-    if (_guardRegistered) {
-      return;
-    }
-    await defender.registerGuard(
-      token: _token,
-      type: guardType,
-      popRoute: _popCurrentRoute,
-    );
-    _guardRegistered = true;
-    if (mounted) {
-      setState(() {
-        _registrationReady = true;
-      });
-    }
+  void _requestGuard(bool wanted) {
+    _guardWanted = wanted;
+    _guardSync ??= _drainGuardRequests();
   }
 
-  Future<void> _unregister() async {
-    if (!_guardRegistered) {
-      return;
-    }
-    _guardRegistered = false;
-    await defender.unregisterGuard(_token);
-    if (mounted) {
-      setState(() {
-        _registrationReady = false;
-      });
+  /// Runs register/unregister calls one at a time until the defender matches
+  /// the latest request, so a dispose or route change made while a
+  /// registration is still pending is applied once it completes.
+  Future<void> _drainGuardRequests() async {
+    try {
+      while (_guardRegistered != _guardWanted) {
+        if (_guardWanted) {
+          await defender.registerGuard(
+            token: _token,
+            type: guardType,
+            popRoute: _popCurrentRoute,
+          );
+          _guardRegistered = true;
+        } else {
+          _guardRegistered = false;
+          await defender.unregisterGuard(_token);
+        }
+        if (mounted) {
+          setState(() {
+            _registrationReady = _guardRegistered;
+          });
+        }
+      }
+    } finally {
+      _guardSync = null;
     }
   }
 
@@ -147,7 +152,7 @@ abstract class _FlutterDefenderGuardState<T extends StatefulWidget>
 
   @override
   void dispose() {
-    unawaited(_unregister());
+    _requestGuard(false);
     super.dispose();
   }
 
@@ -156,11 +161,7 @@ abstract class _FlutterDefenderGuardState<T extends StatefulWidget>
       return;
     }
     _lastShouldGuard = shouldGuard;
-    if (shouldGuard) {
-      unawaited(_register());
-    } else {
-      unawaited(_unregister());
-    }
+    _requestGuard(shouldGuard);
   }
 
   @override

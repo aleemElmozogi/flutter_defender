@@ -50,6 +50,14 @@ class FakeFlutterDefenderPlatform
   Duration loadLifecycleSnapshotDelay = Duration.zero;
   int secureClearAllCallCount = 0;
 
+  /// Protection state as last applied on the native side.
+  bool nativeSecureActive = false;
+
+  /// When set, the next [setProtectionState] call is held until it completes.
+  /// Later calls queue behind it, matching platform-channel FIFO delivery.
+  Completer<void>? setProtectionStateGate;
+  Future<void>? _pendingProtection;
+
   @override
   Future<void> clearLifecycleSnapshot() async {
     lifecycleSnapshot = pigeon.LifecycleSnapshot(
@@ -132,6 +140,26 @@ class FakeFlutterDefenderPlatform
       throw PlatformException(code: 'protection_state_failure');
     }
     protectionCalls.add((secureActive, overlayHardeningActive));
+    final Completer<void>? gate = setProtectionStateGate;
+    setProtectionStateGate = null;
+    final Future<void>? pending = _pendingProtection;
+    if (gate == null && pending == null) {
+      nativeSecureActive = secureActive;
+      return;
+    }
+    final Future<void> applied = (pending ?? Future<void>.value()).then((
+      _,
+    ) async {
+      if (gate != null) {
+        await gate.future;
+      }
+      nativeSecureActive = secureActive;
+    });
+    _pendingProtection = applied;
+    await applied;
+    if (identical(_pendingProtection, applied)) {
+      _pendingProtection = null;
+    }
   }
 
   @override
@@ -656,6 +684,82 @@ void main() {
     },
     variant: TargetPlatformVariant.only(TargetPlatform.iOS),
   );
+
+  testWidgets('guard removed while registration is pending is unregistered', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init();
+    fakePlatform.protectionCalls.clear();
+    final Completer<void> enableGate = Completer<void>();
+    fakePlatform.setProtectionStateGate = enableGate;
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secret')),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(fakePlatform.protectionCalls, equals(<(bool, bool)>[(true, true)]));
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    enableGate.complete();
+    await tester.pumpAndSettle();
+
+    expect(fakePlatform.protectionCalls.last, equals((false, false)));
+    expect(fakePlatform.nativeSecureActive, isFalse);
+
+    // A screen-capture signal only blocks while a guard is still registered.
+    fakePlatform.emitScreenCaptureChanged(true);
+    await tester.pumpAndSettle();
+    expect(defender.hasBlockingOverlay, isFalse);
+  });
+
+  testWidgets('guard that leaves and returns while registration is pending '
+      'stays registered', (WidgetTester tester) async {
+    final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init();
+    fakePlatform.protectionCalls.clear();
+    final Completer<void> enableGate = Completer<void>();
+    fakePlatform.setProtectionStateGate = enableGate;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: navigatorKey,
+        home: const FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secret')),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    unawaited(
+      navigatorKey.currentState!.push(
+        MaterialPageRoute<void>(
+          builder: (_) => const Scaffold(body: Text('next')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    navigatorKey.currentState!.pop();
+    await tester.pumpAndSettle();
+
+    enableGate.complete();
+    await tester.pumpAndSettle();
+
+    expect(fakePlatform.protectionCalls.last, equals((true, true)));
+    expect(fakePlatform.nativeSecureActive, isTrue);
+    expect(find.text('secret'), findsOneWidget);
+
+    fakePlatform.emitScreenCaptureChanged(true);
+    await tester.pumpAndSettle();
+    expect(defender.hasBlockingOverlay, isTrue);
+  });
 
   testWidgets('secure content guard conceals only its own subtree', (
     WidgetTester tester,
