@@ -314,14 +314,16 @@ class FlutterDefenderPlugin : FlutterPlugin, ActivityAware, DefenderHostApi {
     }
 
     private fun unregisterScreenCaptureCallback() {
+        // Even casting to this callback type requires Android 14 or newer.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            return
+        }
         val activeActivity = activity ?: return
         val callback = screenCaptureCallbackHandle as? Activity.ScreenCaptureCallback ?: return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            try {
-                activeActivity.unregisterScreenCaptureCallback(callback)
-            } catch (error: RuntimeException) {
-                Log.w(TAG, "Screen-capture callback unregistration failed.", error)
-            }
+        try {
+            activeActivity.unregisterScreenCaptureCallback(callback)
+        } catch (error: RuntimeException) {
+            Log.w(TAG, "Screen-capture callback unregistration failed.", error)
         }
         screenCaptureCallbackHandle = null
     }

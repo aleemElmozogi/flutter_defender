@@ -245,6 +245,61 @@ void main() {
     expect(find.text('secure'), findsOneWidget);
   });
 
+  for (final bool removeGuard in <bool>[false, true]) {
+    testWidgets(
+      removeGuard
+          ? 'guard disposal does not notify widgets while the tree is locked'
+          : 'guard deactivation does not notify widgets during build',
+      (WidgetTester tester) async {
+        // With native protection unavailable, unregistering the last guard
+        // takes the synchronous policy path used in the reported crashes.
+        await defender.init();
+        fakePlatform.throwOnSetProtectionState = true;
+        final ValueNotifier<bool> enabled = ValueNotifier<bool>(true);
+        addTearDown(enabled.dispose);
+
+        await tester.pumpWidget(
+          AnimatedBuilder(
+            animation: defender,
+            builder: (BuildContext context, Widget? child) => MaterialApp(
+              home: ValueListenableBuilder<bool>(
+                valueListenable: enabled,
+                builder: (BuildContext context, bool value, Widget? child) {
+                  if (removeGuard && !value) {
+                    return const Text('unguarded');
+                  }
+                  return TickerMode(
+                    enabled: value,
+                    child: const FlutterDefenderSensitiveGuard(
+                      child: Scaffold(body: Text('secure')),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        enabled.value = false;
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+        expect(defender.hasBlockingOverlay, isFalse);
+
+        if (!removeGuard) {
+          fakePlatform.throwOnSetProtectionState = false;
+          enabled.value = true;
+          await tester.pumpAndSettle();
+          expect(fakePlatform.protectionCalls.last, (true, true));
+          expect(defender.shouldConcealGuardedContent, isFalse);
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+    );
+  }
+
   testWidgets('strict platform failure policy blocks guarded content', (
     WidgetTester tester,
   ) async {

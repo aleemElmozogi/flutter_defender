@@ -4,6 +4,7 @@ import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import 'flutter_defender_localization_support.dart';
 import 'flutter_defender_platform_interface.dart';
@@ -42,7 +43,25 @@ class _GuardBinding {
 }
 
 class _DefenderNotifier extends ChangeNotifier {
-  void emit() => notifyListeners();
+  bool _notificationScheduled = false;
+
+  void emit() {
+    if (_notificationScheduled) {
+      return;
+    }
+    // Guards can unregister during build or disposal. Keep policy/native
+    // updates immediate, but rebuild listeners only after the tree is unlocked.
+    if (WidgetsBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      _notificationScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _notificationScheduled = false;
+        notifyListeners();
+      });
+      return;
+    }
+    notifyListeners();
+  }
 }
 
 class _PendingInitRequest {
