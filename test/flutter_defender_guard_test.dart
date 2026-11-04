@@ -761,6 +761,40 @@ void main() {
     expect(defender.hasBlockingOverlay, isTrue);
   });
 
+  testWidgets('guard built inactive registers once it becomes active', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init();
+    fakePlatform.protectionCalls.clear();
+
+    Widget buildApp({required bool enabled}) => TickerMode(
+      enabled: enabled,
+      child: const MaterialApp(
+        home: FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secret')),
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(buildApp(enabled: false));
+    await tester.pumpAndSettle();
+    expect(fakePlatform.protectionCalls, isEmpty);
+    expect(fakePlatform.nativeSecureActive, isFalse);
+
+    await tester.pumpWidget(buildApp(enabled: true));
+    await tester.pumpAndSettle();
+
+    expect(fakePlatform.protectionCalls, equals(<(bool, bool)>[(true, true)]));
+    expect(fakePlatform.nativeSecureActive, isTrue);
+    expect(find.text('secret'), findsOneWidget);
+    expect(
+      find.text(FlutterDefenderMessages.protectedContentHidden),
+      findsNothing,
+    );
+  });
+
   testWidgets('secure content guard conceals only its own subtree', (
     WidgetTester tester,
   ) async {

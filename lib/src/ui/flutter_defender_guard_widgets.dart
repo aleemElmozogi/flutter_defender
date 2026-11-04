@@ -103,7 +103,11 @@ abstract class _FlutterDefenderGuardState<T extends StatefulWidget>
 
   void _requestGuard(bool wanted) {
     _guardWanted = wanted;
-    _guardSync ??= _drainGuardRequests();
+    // A drain with nothing to do finishes synchronously, so starting one here
+    // would leave its completed future in _guardSync and block later drains.
+    if (_guardSync == null && _guardRegistered != _guardWanted) {
+      _guardSync = _drainGuardRequests();
+    }
   }
 
   /// Runs register/unregister calls one at a time until the defender matches
