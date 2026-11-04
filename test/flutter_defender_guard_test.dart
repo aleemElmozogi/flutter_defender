@@ -336,6 +336,42 @@ void main() {
     },
   );
 
+  for (final bool ignoreBlocking in <bool>[true, false]) {
+    testWidgets(
+      ignoreBlocking
+          ? 'failed native disable is retried while screen blocking is ignored'
+          : 'failed native disable is retried after the last guard leaves',
+      (WidgetTester tester) async {
+        await defender.init();
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: FlutterDefenderSensitiveGuard(
+              child: Scaffold(body: Text('secure')),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(fakePlatform.nativeSecureActive, isTrue);
+
+        fakePlatform.throwOnSetProtectionState = true;
+        if (ignoreBlocking) {
+          await defender.init(ignoreScreenBlocking: true);
+        } else {
+          await tester.pumpWidget(const MaterialApp(home: Text('public')));
+        }
+        await tester.pumpAndSettle();
+        expect(fakePlatform.nativeSecureActive, isTrue);
+
+        fakePlatform.throwOnSetProtectionState = false;
+        fakePlatform.emitForegroundStateChanged(true);
+        await tester.pumpAndSettle();
+
+        expect(fakePlatform.protectionCalls.last, (false, false));
+        expect(fakePlatform.nativeSecureActive, isFalse);
+      },
+    );
+  }
+
   testWidgets(
     'switching ignoreScreenBlocking on while a native enable is pending leaves protection disabled',
         (WidgetTester tester) async {
@@ -1444,8 +1480,6 @@ void main() {
       findsNothing,
     );
   });
-}
-
   for (final bool removeGuard in <bool>[false, true]) {
     testWidgets(
       removeGuard
@@ -1500,3 +1534,4 @@ void main() {
       },
     );
   }
+}

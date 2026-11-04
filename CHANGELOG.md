@@ -5,12 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.8.0] - 2026-11-04
+
+### Added
+
+- Added opt-in `ignoreScreenBlocking` initialization and `screenBlockingIgnored` state for QA and automated testing. The bypass disables concealment, blocking UI, and native hardening while retaining device-risk callbacks and session timeouts. It defaults to `false` in every build mode.
 
 ### Fixed
 
 - Guard removal during build or disposal now defers listener notifications until the widget tree is unlocked.
 - Android activity teardown checks the OS version before resolving the Android 14 screen-capture callback type, preventing a crash on older devices.
+- Guard registration now applies route changes and disposal requested while native protection is still being enabled, without leaving stale guard tokens behind.
+- Guards created inactive can register when they become active, and guards that leave and return during registration retain protection.
+- Switching the bypass on or removing the last guard disables pending native enables. Failed native disables are retried on later protection synchronization.
+- Restored the lifecycle regression tests to the test entry point after merging the guard changes.
+
+### Tests
+
+- Added regression coverage for guard registration races, inactive guard activation, bypass transitions, failed native-disable recovery, and pre-Android 14 callback compatibility.
+- Expanded the example integration test to navigate sensitive and OTP routes and toggle the bypass on an active guarded screen, scrolling to lazy-built actions before using them.
+
+### Development
+
+- Pinned Java 17 for Android unit tests in CI and release verification.
+- Release automation now dispatches publishing with the workflow token without requiring a personal access token.
 
 ## [0.7.0] - 2026-08-31
 

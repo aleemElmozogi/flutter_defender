@@ -88,15 +88,16 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
     final bool hasGuards = _activeGuards.isNotEmpty;
     if (!hasGuards) {
       if (_runtime.nativeProtectionRequested) {
-        _runtime
-          ..nativeProtectionRequested = false
-          ..nativeProtectionActive = false;
-        await _safeSetProtectionState(
+        _runtime.nativeProtectionActive = false;
+        final bool protectionDisabled = await _safeSetProtectionState(
           secureActive: false,
           overlayHardeningActive: false,
         );
         if (generation != _syncGeneration) {
           return;
+        }
+        if (protectionDisabled) {
+          _runtime.nativeProtectionRequested = false;
         }
       } else {
         // A guard can leave during build, so never notify listeners before the
@@ -125,15 +126,16 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
     final bool nativeProtectionWanted =
         hasGuards && !_config.ignoreScreenBlocking;
     if (!nativeProtectionWanted && _runtime.nativeProtectionRequested) {
-      _runtime
-        ..nativeProtectionRequested = false
-        ..nativeProtectionActive = false;
-      await _safeSetProtectionState(
+      _runtime.nativeProtectionActive = false;
+      final bool protectionDisabled = await _safeSetProtectionState(
         secureActive: false,
         overlayHardeningActive: false,
       );
       if (generation != _syncGeneration) {
         return;
+      }
+      if (protectionDisabled) {
+        _runtime.nativeProtectionRequested = false;
       }
     }
 
