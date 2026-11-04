@@ -898,6 +898,116 @@ void main() {
     variant: TargetPlatformVariant.only(TargetPlatform.iOS),
   );
 
+  testWidgets('guard removed while registration is pending is unregistered', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init();
+    fakePlatform.protectionCalls.clear();
+    final Completer<void> enableGate = Completer<void>();
+    fakePlatform.setProtectionStateGate = enableGate;
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secret')),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(fakePlatform.protectionCalls, equals(<(bool, bool)>[(true, true)]));
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    enableGate.complete();
+    await tester.pumpAndSettle();
+
+    expect(fakePlatform.protectionCalls.last, equals((false, false)));
+    expect(fakePlatform.nativeSecureActive, isFalse);
+
+    // A screen-capture signal only blocks while a guard is still registered.
+    fakePlatform.emitScreenCaptureChanged(true);
+    await tester.pumpAndSettle();
+    expect(defender.hasBlockingOverlay, isFalse);
+  });
+
+  testWidgets('guard that leaves and returns while registration is pending '
+      'stays registered', (WidgetTester tester) async {
+    final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init();
+    fakePlatform.protectionCalls.clear();
+    final Completer<void> enableGate = Completer<void>();
+    fakePlatform.setProtectionStateGate = enableGate;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: navigatorKey,
+        home: const FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secret')),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    unawaited(
+      navigatorKey.currentState!.push(
+        MaterialPageRoute<void>(
+          builder: (_) => const Scaffold(body: Text('next')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    navigatorKey.currentState!.pop();
+    await tester.pumpAndSettle();
+
+    enableGate.complete();
+    await tester.pumpAndSettle();
+
+    expect(fakePlatform.protectionCalls.last, equals((true, true)));
+    expect(fakePlatform.nativeSecureActive, isTrue);
+    expect(find.text('secret'), findsOneWidget);
+
+    fakePlatform.emitScreenCaptureChanged(true);
+    await tester.pumpAndSettle();
+    expect(defender.hasBlockingOverlay, isTrue);
+  });
+
+  testWidgets('guard built inactive registers once it becomes active', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init();
+    fakePlatform.protectionCalls.clear();
+
+    Widget buildApp({required bool enabled}) => TickerMode(
+      enabled: enabled,
+      child: const MaterialApp(
+        home: FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secret')),
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(buildApp(enabled: false));
+    await tester.pumpAndSettle();
+    expect(fakePlatform.protectionCalls, isEmpty);
+    expect(fakePlatform.nativeSecureActive, isFalse);
+
+    await tester.pumpWidget(buildApp(enabled: true));
+    await tester.pumpAndSettle();
+
+    expect(fakePlatform.protectionCalls, equals(<(bool, bool)>[(true, true)]));
+    expect(fakePlatform.nativeSecureActive, isTrue);
+    expect(find.text('secret'), findsOneWidget);
+    expect(
+      find.text(FlutterDefenderMessages.protectedContentHidden),
+      findsNothing,
+    );
+  });
+
   testWidgets('secure content guard conceals only its own subtree', (
     WidgetTester tester,
   ) async {
