@@ -50,6 +50,14 @@ class FakeFlutterDefenderPlatform
   Duration loadLifecycleSnapshotDelay = Duration.zero;
   int secureClearAllCallCount = 0;
 
+  /// Protection state as last applied on the native side.
+  bool nativeSecureActive = false;
+
+  /// When set, the next [setProtectionState] call is held until it completes.
+  /// Later calls queue behind it, matching platform-channel FIFO delivery.
+  Completer<void>? setProtectionStateGate;
+  Future<void>? _pendingProtection;
+
   @override
   Future<void> clearLifecycleSnapshot() async {
     lifecycleSnapshot = pigeon.LifecycleSnapshot(
@@ -132,6 +140,26 @@ class FakeFlutterDefenderPlatform
       throw PlatformException(code: 'protection_state_failure');
     }
     protectionCalls.add((secureActive, overlayHardeningActive));
+    final Completer<void>? gate = setProtectionStateGate;
+    setProtectionStateGate = null;
+    final Future<void>? pending = _pendingProtection;
+    if (gate == null && pending == null) {
+      nativeSecureActive = secureActive;
+      return;
+    }
+    final Future<void> applied = (pending ?? Future<void>.value()).then((
+      _,
+    ) async {
+      if (gate != null) {
+        await gate.future;
+      }
+      nativeSecureActive = secureActive;
+    });
+    _pendingProtection = applied;
+    await applied;
+    if (identical(_pendingProtection, applied)) {
+      _pendingProtection = null;
+    }
   }
 
   @override
@@ -205,7 +233,7 @@ void main() {
     FlutterDefenderPlatform.instance = fakePlatform;
     defender = FlutterDefender.instance;
     defender.debugSetNowProvider(() => now);
-    await defender.init();
+    await defender.init(ignoreScreenBlocking: false);
   });
 
   tearDown(() {
@@ -245,12 +273,219 @@ void main() {
     expect(find.text('secure'), findsOneWidget);
   });
 
+  testWidgets('ignoreScreenBlocking keeps guarded content visible', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init(ignoreScreenBlocking: true);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secure')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Policy violations are detected but never block the guarded screen.
+    fakePlatform.emitScreenCaptureChanged(true);
+    fakePlatform.emitOverlayViolation();
+    fakePlatform.emitForegroundStateChanged(false);
+    fakePlatform.emitScreenshot();
+    await tester.pumpAndSettle();
+
+    expect(defender.screenBlockingIgnored, isTrue);
+    expect(defender.hasBlockingOverlay, isFalse);
+    expect(defender.shouldConcealGuardedContent, isFalse);
+    expect(find.byType(BlockingScreen), findsNothing);
+    expect(find.text('secure'), findsOneWidget);
+    // Native hardening (FLAG_SECURE / secure surface) is never enabled either,
+    // so screenshots are not blocked.
+    expect(fakePlatform.protectionCalls, isNot(contains((true, true))));
+  });
+
+  testWidgets(
+    'switching ignoreScreenBlocking on while a guard is active disables native protection',
+    (WidgetTester tester) async {
+      defender.dispose();
+      defender = FlutterDefender.instance;
+      await defender.init(ignoreScreenBlocking: false);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: FlutterDefenderSensitiveGuard(
+            child: Scaffold(body: Text('secure')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Native protection should be active initially.
+      expect(fakePlatform.protectionCalls, contains((true, true)));
+      expect(fakePlatform.protectionCalls.last, equals((true, true)));
+
+      // Re-initialize with ignoreScreenBlocking: true while the guard is still active.
+      await defender.init(ignoreScreenBlocking: true);
+      await tester.pumpAndSettle();
+
+      expect(defender.screenBlockingIgnored, isTrue);
+      // Explicitly disabled via setProtectionState(false, false).
+      expect(fakePlatform.protectionCalls.last, equals((false, false)));
+    },
+  );
+
+  testWidgets(
+    'switching ignoreScreenBlocking on while a native enable is pending leaves protection disabled',
+    (WidgetTester tester) async {
+      defender.dispose();
+      defender = FlutterDefender.instance;
+      await defender.init(ignoreScreenBlocking: false);
+      fakePlatform.protectionCalls.clear();
+      final Completer<void> enableGate = Completer<void>();
+      fakePlatform.setProtectionStateGate = enableGate;
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: FlutterDefenderSensitiveGuard(
+            child: Scaffold(body: Text('secure')),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(
+        fakePlatform.protectionCalls,
+        equals(<(bool, bool)>[(true, true)]),
+      );
+      expect(fakePlatform.nativeSecureActive, isFalse);
+
+      unawaited(defender.init(ignoreScreenBlocking: true));
+      await tester.pump();
+      enableGate.complete();
+      await tester.pumpAndSettle();
+
+      expect(defender.screenBlockingIgnored, isTrue);
+      expect(fakePlatform.protectionCalls.last, equals((false, false)));
+      expect(fakePlatform.nativeSecureActive, isFalse);
+      expect(find.text('secure'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'removing the last guard while a native enable is pending leaves protection disabled',
+    (WidgetTester tester) async {
+      defender.dispose();
+      defender = FlutterDefender.instance;
+      await defender.init(ignoreScreenBlocking: true);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: FlutterDefenderSensitiveGuard(
+            child: Scaffold(body: Text('secure')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      fakePlatform.protectionCalls.clear();
+
+      final Completer<void> enableGate = Completer<void>();
+      fakePlatform.setProtectionStateGate = enableGate;
+      unawaited(defender.init(ignoreScreenBlocking: false));
+      await tester.pump();
+      expect(
+        fakePlatform.protectionCalls,
+        equals(<(bool, bool)>[(true, true)]),
+      );
+
+      await tester.pumpWidget(const MaterialApp(home: Text('public')));
+      await tester.pump();
+      enableGate.complete();
+      await tester.pumpAndSettle();
+
+      expect(fakePlatform.protectionCalls.last, equals((false, false)));
+      expect(fakePlatform.nativeSecureActive, isFalse);
+    },
+  );
+
+  testWidgets(
+    'ignoreScreenBlocking does not notify listeners during build when the last guard leaves',
+    (WidgetTester tester) async {
+      defender.dispose();
+      defender = FlutterDefender.instance;
+      await defender.init(ignoreScreenBlocking: true);
+
+      final GlobalKey<NavigatorState> navigatorKey =
+          GlobalKey<NavigatorState>();
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: navigatorKey,
+          builder: (BuildContext context, Widget? child) => Column(
+            children: <Widget>[
+              ListenableBuilder(
+                listenable: defender,
+                builder: (BuildContext context, Widget? _) =>
+                    const Text('listener'),
+              ),
+              Expanded(child: child!),
+            ],
+          ),
+          home: const FlutterDefenderSensitiveGuard(
+            child: Scaffold(body: Text('secure')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      unawaited(
+        navigatorKey.currentState!.push(
+          MaterialPageRoute<void>(
+            builder: (BuildContext context) =>
+                const Scaffold(body: Text('public')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.text('public'), findsOneWidget);
+
+      navigatorKey.currentState!.pop();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.text('secure'), findsOneWidget);
+      expect(fakePlatform.protectionCalls, isNot(contains((true, true))));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: navigatorKey,
+          builder: (BuildContext context, Widget? child) => Column(
+            children: <Widget>[
+              ListenableBuilder(
+                listenable: defender,
+                builder: (BuildContext context, Widget? _) =>
+                    const Text('listener'),
+              ),
+              Expanded(child: child!),
+            ],
+          ),
+          home: const Scaffold(body: Text('public')),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.text('secure'), findsNothing);
+    },
+  );
+
   testWidgets('strict platform failure policy blocks guarded content', (
     WidgetTester tester,
   ) async {
     defender.dispose();
     defender = FlutterDefender.instance;
-    await defender.init(failClosedOnPlatformError: true);
+    await defender.init(
+      failClosedOnPlatformError: true,
+      ignoreScreenBlocking: false,
+    );
     fakePlatform.throwOnSetProtectionState = true;
 
     await tester.pumpWidget(
@@ -286,6 +521,7 @@ void main() {
       var logoutCalls = 0;
       await defender.init(
         authenticatedBackgroundTimeoutSeconds: 1,
+        ignoreScreenBlocking: false,
         onLogoutRequested: () {
           logoutCalls += 1;
         },
@@ -338,6 +574,7 @@ void main() {
       var logoutCalls = 0;
       await defender.init(
         authenticatedBackgroundTimeoutSeconds: 1,
+        ignoreScreenBlocking: false,
         onLogoutRequested: () {
           logoutCalls += 1;
         },
@@ -375,6 +612,7 @@ void main() {
     defender = FlutterDefender.instance;
     await defender.init(
       blockingScreenBuilder: (String message) => Center(child: Text(message)),
+      ignoreScreenBlocking: false,
     );
 
     await tester.pumpWidget(
@@ -419,6 +657,7 @@ void main() {
     defender = FlutterDefender.instance;
     await defender.init(
       blockingScreenBuilder: (String message) => Center(child: Text(message)),
+      ignoreScreenBlocking: false,
     );
 
     await tester.pumpWidget(
@@ -468,7 +707,7 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     defender.dispose();
     defender = FlutterDefender.instance;
-    await defender.init();
+    await defender.init(ignoreScreenBlocking: false);
 
     await tester.pumpWidget(
       const MaterialApp(
@@ -513,6 +752,7 @@ void main() {
     defender = FlutterDefender.instance;
     await defender.init(
       blockingScreenBuilder: (String message) => Center(child: Text(message)),
+      ignoreScreenBlocking: false,
     );
 
     await tester.pumpWidget(
@@ -558,6 +798,7 @@ void main() {
     defender = FlutterDefender.instance;
     await defender.init(
       blockingScreenBuilder: (String message) => Center(child: Text(message)),
+      ignoreScreenBlocking: false,
     );
 
     await tester.pumpWidget(
@@ -656,6 +897,116 @@ void main() {
     },
     variant: TargetPlatformVariant.only(TargetPlatform.iOS),
   );
+
+  testWidgets('guard removed while registration is pending is unregistered', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init();
+    fakePlatform.protectionCalls.clear();
+    final Completer<void> enableGate = Completer<void>();
+    fakePlatform.setProtectionStateGate = enableGate;
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secret')),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(fakePlatform.protectionCalls, equals(<(bool, bool)>[(true, true)]));
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    enableGate.complete();
+    await tester.pumpAndSettle();
+
+    expect(fakePlatform.protectionCalls.last, equals((false, false)));
+    expect(fakePlatform.nativeSecureActive, isFalse);
+
+    // A screen-capture signal only blocks while a guard is still registered.
+    fakePlatform.emitScreenCaptureChanged(true);
+    await tester.pumpAndSettle();
+    expect(defender.hasBlockingOverlay, isFalse);
+  });
+
+  testWidgets('guard that leaves and returns while registration is pending '
+      'stays registered', (WidgetTester tester) async {
+    final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init();
+    fakePlatform.protectionCalls.clear();
+    final Completer<void> enableGate = Completer<void>();
+    fakePlatform.setProtectionStateGate = enableGate;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: navigatorKey,
+        home: const FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secret')),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    unawaited(
+      navigatorKey.currentState!.push(
+        MaterialPageRoute<void>(
+          builder: (_) => const Scaffold(body: Text('next')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    navigatorKey.currentState!.pop();
+    await tester.pumpAndSettle();
+
+    enableGate.complete();
+    await tester.pumpAndSettle();
+
+    expect(fakePlatform.protectionCalls.last, equals((true, true)));
+    expect(fakePlatform.nativeSecureActive, isTrue);
+    expect(find.text('secret'), findsOneWidget);
+
+    fakePlatform.emitScreenCaptureChanged(true);
+    await tester.pumpAndSettle();
+    expect(defender.hasBlockingOverlay, isTrue);
+  });
+
+  testWidgets('guard built inactive registers once it becomes active', (
+    WidgetTester tester,
+  ) async {
+    defender.dispose();
+    defender = FlutterDefender.instance;
+    await defender.init();
+    fakePlatform.protectionCalls.clear();
+
+    Widget buildApp({required bool enabled}) => TickerMode(
+      enabled: enabled,
+      child: const MaterialApp(
+        home: FlutterDefenderSensitiveGuard(
+          child: Scaffold(body: Text('secret')),
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(buildApp(enabled: false));
+    await tester.pumpAndSettle();
+    expect(fakePlatform.protectionCalls, isEmpty);
+    expect(fakePlatform.nativeSecureActive, isFalse);
+
+    await tester.pumpWidget(buildApp(enabled: true));
+    await tester.pumpAndSettle();
+
+    expect(fakePlatform.protectionCalls, equals(<(bool, bool)>[(true, true)]));
+    expect(fakePlatform.nativeSecureActive, isTrue);
+    expect(find.text('secret'), findsOneWidget);
+    expect(
+      find.text(FlutterDefenderMessages.protectedContentHidden),
+      findsNothing,
+    );
+  });
 
   testWidgets('secure content guard conceals only its own subtree', (
     WidgetTester tester,
@@ -763,7 +1114,10 @@ void main() {
   ) async {
     defender.dispose();
     defender = FlutterDefender.instance;
-    await defender.init(enableProxyVpnDetection: true);
+    await defender.init(
+      enableProxyVpnDetection: true,
+      ignoreScreenBlocking: false,
+    );
     fakePlatform.advancedSecuritySignals = pigeon.AdvancedSecuritySignals(
       rootedOrJailbroken: false,
       proxyEnabled: false,
@@ -802,7 +1156,7 @@ void main() {
   ) async {
     defender.dispose();
     defender = FlutterDefender.instance;
-    await defender.init(enableRaspDetection: true);
+    await defender.init(enableRaspDetection: true, ignoreScreenBlocking: false);
     fakePlatform.advancedSecuritySignals = pigeon.AdvancedSecuritySignals(
       rootedOrJailbroken: false,
       proxyEnabled: false,
@@ -1054,8 +1408,14 @@ void main() {
     defender.dispose();
     defender = FlutterDefender.instance;
 
-    final Future<void> initA = defender.init(enableForegroundCheck: true);
-    final Future<void> initB = defender.init(enableForegroundCheck: false);
+    final Future<void> initA = defender.init(
+      enableForegroundCheck: true,
+      ignoreScreenBlocking: false,
+    );
+    final Future<void> initB = defender.init(
+      enableForegroundCheck: false,
+      ignoreScreenBlocking: false,
+    );
     await Future.wait(<Future<void>>[initA, initB]);
 
     await tester.pumpWidget(

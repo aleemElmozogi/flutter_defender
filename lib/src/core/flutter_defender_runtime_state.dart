@@ -38,6 +38,10 @@ class FlutterDefenderRuntimeState {
   bool isAuthenticated = false;
   bool protectionReady = false;
   bool nativeProtectionActive = false;
+
+  /// Last state sent to native `setProtectionState`. Set before the call so a
+  /// pending enable is still disabled when policy changes mid-flight.
+  bool nativeProtectionRequested = false;
   bool pendingColdStartOtpPop = false;
   bool inactivePrivacyShieldActive = false;
   bool windowFocusConcealActive = false;
@@ -86,6 +90,7 @@ class FlutterDefenderRuntimeState {
     isAuthenticated = false;
     protectionReady = false;
     nativeProtectionActive = false;
+    nativeProtectionRequested = false;
     pendingColdStartOtpPop = false;
     inactivePrivacyShieldActive = false;
     windowFocusConcealActive = false;
