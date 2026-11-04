@@ -176,6 +176,7 @@ abstract class _FlutterDefenderGuardState<T extends StatefulWidget>
         final bool shouldGuard = isRouteCurrent && isRouteActiveInTree;
         _syncGuardRegistration(shouldGuard);
         final bool concealContent =
+            !defender.screenBlockingIgnored &&
             shouldGuard &&
             (!_registrationReady ||
                 defender.shouldConcealGuardedContent ||
@@ -246,6 +247,8 @@ class _FlutterDefenderSensitiveGuardState
 }
 
 /// Conceals only its child bounds while native protection remains active.
+///
+/// Nothing is concealed while [FlutterDefender.screenBlockingIgnored] is true.
 class FlutterDefenderSecureContentGuard extends StatefulWidget {
   const FlutterDefenderSecureContentGuard({
     required this.child,
