@@ -47,6 +47,6 @@ workflow. Configure the package for automated publishing and protect the
 `pub.dev` GitHub Actions environment.
 
 GitHub does not trigger another workflow when a workflow pushes a tag using the
-default `GITHUB_TOKEN`. Add a fine-grained repository secret named
-`RELEASE_TAG_TOKEN` with `Contents: Read and write`; the release-tag workflow
-uses it only to push the release tag that starts the publishing workflow.
+default `GITHUB_TOKEN`. The release-tag workflow explicitly dispatches
+`publish.yml` at the release tag using that token, with `actions: write` and
+`contents: write` permissions. No personal access token is required.

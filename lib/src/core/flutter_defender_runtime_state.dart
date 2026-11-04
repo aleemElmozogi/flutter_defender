@@ -38,6 +38,10 @@ class FlutterDefenderRuntimeState {
   bool isAuthenticated = false;
   bool protectionReady = false;
   bool nativeProtectionActive = false;
+
+  /// Whether native protection may still be enabled. Set before enabling and
+  /// cleared only after a successful disable so failed cleanup can be retried.
+  bool nativeProtectionRequested = false;
   bool pendingColdStartOtpPop = false;
   bool inactivePrivacyShieldActive = false;
   bool windowFocusConcealActive = false;
@@ -86,6 +90,7 @@ class FlutterDefenderRuntimeState {
     isAuthenticated = false;
     protectionReady = false;
     nativeProtectionActive = false;
+    nativeProtectionRequested = false;
     pendingColdStartOtpPop = false;
     inactivePrivacyShieldActive = false;
     windowFocusConcealActive = false;

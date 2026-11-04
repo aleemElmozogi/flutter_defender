@@ -30,7 +30,7 @@ that handle sensitive data.
 
 ```yaml
 dependencies:
-  flutter_defender: ^0.7.0
+  flutter_defender: ^0.8.0
 ```
 
 Then run:
@@ -110,6 +110,13 @@ Common `init` options:
 | `enableRaspDetection` | Block on debugger or hooking signals | `false` |
 | `enableSecureStorageHelper` | Enable the optional storage API | `false` |
 | `failClosedOnPlatformError` | Keep guarded content blocked after native protection errors | `false` |
+| `ignoreScreenBlocking` | Bypass concealment, blocking UI, and native hardening for QA/testing | `false` in every build mode |
+
+Use `ignoreScreenBlocking: true` only for QA or automated testing. It allows
+screenshots and disables Android overlay hiding and obscured-touch filtering.
+Root, proxy/VPN, and tampering checks and their callbacks still run, as do
+session timeouts. Android overlay and window-focus events are not reported
+while native hardening is disabled. Keep this option off in production.
 
 Callbacks such as `onRootDetected`, `onProxyOrVpnDetected`, and
 `onTamperingDetected` let the host app record or react to policy events. UI can

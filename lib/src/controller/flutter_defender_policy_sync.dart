@@ -87,15 +87,25 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
     final int generation = ++_syncGeneration;
     final bool hasGuards = _activeGuards.isNotEmpty;
     if (!hasGuards) {
-      if (_runtime.nativeProtectionActive) {
-        await _safeSetProtectionState(
+      if (_runtime.nativeProtectionRequested) {
+        _runtime.nativeProtectionActive = false;
+        final bool protectionDisabled = await _safeSetProtectionState(
           secureActive: false,
           overlayHardeningActive: false,
         );
         if (generation != _syncGeneration) {
           return;
         }
-        _runtime.nativeProtectionActive = false;
+        if (protectionDisabled) {
+          _runtime.nativeProtectionRequested = false;
+        }
+      } else {
+        // A guard can leave during build, so never notify listeners before the
+        // first await, even when there is no native state to disable.
+        await Future<void>.value();
+        if (generation != _syncGeneration) {
+          return;
+        }
       }
       _runtime
         ..platformUnavailableBlocked = false
@@ -109,21 +119,49 @@ extension _FlutterDefenderPolicySync on FlutterDefender {
       return;
     }
 
+    // When screen blocking is ignored (opt-in via `init`), native
+    // hardening such as FLAG_SECURE / the iOS secure surface is never enabled,
+    // so screenshots and screen sharing are not blocked. Disabling keys off the
+    // last requested state, so an enable still in flight is overridden too.
+    final bool nativeProtectionWanted =
+        hasGuards && !_config.ignoreScreenBlocking;
+    if (!nativeProtectionWanted && _runtime.nativeProtectionRequested) {
+      _runtime.nativeProtectionActive = false;
+      final bool protectionDisabled = await _safeSetProtectionState(
+        secureActive: false,
+        overlayHardeningActive: false,
+      );
+      if (generation != _syncGeneration) {
+        return;
+      }
+      if (protectionDisabled) {
+        _runtime.nativeProtectionRequested = false;
+      }
+    }
+
     final bool needsProtectionWarmup =
-        concealUntilProtectionReady && !_runtime.nativeProtectionActive;
+        concealUntilProtectionReady &&
+        nativeProtectionWanted &&
+        !_runtime.nativeProtectionActive;
     if (needsProtectionWarmup) {
       _runtime.protectionReady = false;
       _notifyListeners();
     }
 
-    final bool protectionStateSucceeded = await _safeSetProtectionState(
-      secureActive: hasGuards,
-      overlayHardeningActive: hasGuards,
-    );
+    if (nativeProtectionWanted) {
+      _runtime.nativeProtectionRequested = true;
+    }
+    final bool protectionStateSucceeded = nativeProtectionWanted
+        ? await _safeSetProtectionState(
+            secureActive: true,
+            overlayHardeningActive: true,
+          )
+        : true;
     if (generation != _syncGeneration) {
       return;
     }
-    _runtime.nativeProtectionActive = hasGuards && protectionStateSucceeded;
+    _runtime.nativeProtectionActive =
+        nativeProtectionWanted && protectionStateSucceeded;
 
     final bool advancedDetectionEnabled =
         hasGuards &&
